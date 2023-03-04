@@ -30,7 +30,11 @@ public class ProjectController {
     ProjectDtoFactory projectDtoFactory;
 
     ControllerHelper controllerHelper;
-
+    // TODO получить все проекты -> показать таблицей на экране -> кликнув на проект выгрузить
+    // перейти внурь проекта и выгрузить все такси ?
+    // кнопка добавить новую таску
+    // и на каждой таске кнопка  изменить статус ?
+    // TODO   состояния на таске   (принято, ожидание принятия, на проверки)
     public static final String FETCH_PROJECTS = "/api/projects";
     public static final String CREATE_OR_UPDATE_PROJECT = "/api/projects";
     public static final String DELETE_PROJECT = "/api/projects/{project_id}";
@@ -51,10 +55,9 @@ public class ProjectController {
     }
 
     @PutMapping(CREATE_OR_UPDATE_PROJECT)
-    public ProjectDto createOrUpdateProject(
+    public ProjectDto updateProject(
             @RequestParam(value = "project_id", required = false) Optional<Long> optionalProjectId,
             @RequestParam(value = "project_name", required = false) Optional<String> optionalProjectName) {
-
         optionalProjectName = optionalProjectName.filter(projectName -> !projectName.trim().isEmpty());
 
         boolean isCreate = !optionalProjectId.isPresent();
@@ -66,6 +69,46 @@ public class ProjectController {
         final ProjectEntity project = optionalProjectId
                 .map(controllerHelper::getProjectOrThrowException)
                 .orElseGet(() -> ProjectEntity.builder().build());
+
+        optionalProjectName
+                .ifPresent(projectName -> {
+
+                    projectRepository
+                            .findByName(projectName)
+                            .filter(anotherProject -> !Objects.equals(anotherProject.getId(), project.getId()))
+                            .ifPresent(anotherProject -> {
+                                throw new BadRequestException(
+                                        String.format("Project \"%s\" already exists.", projectName)
+                                );
+                            });
+
+                    project.setName(projectName);
+                });
+
+        final ProjectEntity savedProject = projectRepository.saveAndFlush(project);
+
+        return projectDtoFactory.makeProjectDto(savedProject);
+    }
+
+    @PostMapping(CREATE_OR_UPDATE_PROJECT)
+    public ProjectDto creatProject(
+            @RequestParam(value = "project_id", required = false) Optional<Long> optionalProjectId,
+            @RequestParam(value = "project_name", required = false) Optional<String> optionalProjectName) {
+        System.out.println(optionalProjectId + " " + optionalProjectName);
+        optionalProjectName = optionalProjectName.filter(projectName -> !projectName.trim().isEmpty());
+
+        boolean isCreate = !optionalProjectId.isPresent();
+
+        if (isCreate && !optionalProjectName.isPresent()) {
+            throw new BadRequestException("Project name can't be empty.");
+        }
+
+        if (projectRepository.findById(optionalProjectId.get()).isPresent()) {
+            throw new BadRequestException(
+                    String.format("Project id \"%s\" already exists.", optionalProjectId.get())
+            );
+        }
+        final ProjectEntity project = ProjectEntity.builder().build();
 
         optionalProjectName
                 .ifPresent(projectName -> {
