@@ -17,9 +17,6 @@ public class TaskStateDto {
     @NonNull
     Long id;
 
-    @NonNull
-    String name;
-
     @JsonProperty("left_task_state_id")
     Long leftTaskStateId;
 
@@ -31,5 +28,8 @@ public class TaskStateDto {
     Instant createdAt;
 
     @NonNull
-    List<TaskDto> tasks;
+    Long projectId;
+
+    @NonNull
+    List<Long> tasks;
 }

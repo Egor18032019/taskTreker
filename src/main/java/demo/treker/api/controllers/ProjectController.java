@@ -103,10 +103,12 @@ public class ProjectController {
             throw new BadRequestException("Project name can't be empty.");
         }
 
-        if (projectRepository.findById(optionalProjectId.get()).isPresent()) {
-            throw new BadRequestException(
-                    String.format("Project id \"%s\" already exists.", optionalProjectId.get())
-            );
+        if (optionalProjectId.isPresent()) {
+            if (projectRepository.findById(optionalProjectId.get()).isPresent()) {
+                throw new BadRequestException(
+                        String.format("Project id \"%s\" already exists.", optionalProjectId.get())
+                );
+            }
         }
         final ProjectEntity project = ProjectEntity.builder().build();
 
