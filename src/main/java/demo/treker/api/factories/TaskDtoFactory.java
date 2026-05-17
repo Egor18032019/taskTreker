@@ -22,6 +22,12 @@ public class TaskDtoFactory {
                 .name(entity.getName())
                 .description(entity.getDescription())
                 .createdAt(entity.getCreatedAt())
+                .taskStateId(entity.getTaskState().getId())
+                .sizePoints(entity.getSizePoints())
+                .sizeCategory(entity.getSizeCategory())
+                .deadline(entity.getDeadline())
+                .priority(entity.getPriority())
+                .complexity(entity.getComplexity())
                 .build();
     }
 }

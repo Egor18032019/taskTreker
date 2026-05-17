@@ -52,41 +52,39 @@ public class TaskService {
     }
 
     @Transactional
-    public TaskEntity createTask(String name, String description,
+    public TaskEntity createTask(String name, String description, Long projectId,
             Integer sizePoints, String sizeCategory, LocalDate deadline,
-            String complexity, String priority,
-            Long projectId) { // 👈 project_id теперь обязателен для авто-создания состояния
+            String complexity, String priority) {
 
         if (name == null || name.trim().isEmpty()) {
             throw new BadRequestException("Task name can't be empty.");
         }
 
-        // 1. Проверяем проект
         ProjectEntity project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
 
-        // 2. Находим текущий "хвост" воркфлоу (состояние, у которого right = null)
+        // 1. Находим текущий хвост воркфлоу
         TaskStateEntity tailState = taskStateRepository
                 .findByProjectIdAndRightTaskStateIsNull(projectId)
                 .orElse(null);
 
-        // 3. Создаём новое техническое состояние
+        // 2. Создаём новое техническое состояние
         TaskStateEntity newState = TaskStateEntity.builder()
                 .project(project)
-                .leftTaskState(tailState)  // ← линкуем к предыдущему
-                .rightTaskState(null)      // → становится новым хвостом
+                .leftTaskState(tailState)  // ссылка на managed entity (если tailState != null)
+                .rightTaskState(null)
                 .build();
 
-        // 4. Обновляем предыдущее состояние (если оно было)
+        // 3. 🔥 СНАЧАЛА сохраняем НОВОЕ состояние → оно переходит в состояние managed
+        TaskStateEntity savedNewState = taskStateRepository.saveAndFlush(newState);
+
+        // 4. Теперь обновляем СТАРОЕ состояние (ссылается на managed entity → ошибки нет)
         if (tailState != null) {
-            tailState.setRightTaskState(newState);
-            taskStateRepository.saveAndFlush(tailState); // сохраняем разрыв старой ссылки
+            tailState.setRightTaskState(savedNewState);
+            taskStateRepository.saveAndFlush(tailState);
         }
 
-        // 5. Сохраняем новое состояние
-        TaskStateEntity savedState = taskStateRepository.saveAndFlush(newState);
-
-        // 6. Создаём задачу и привязываем её к НОВОМУ состоянию
+        // 5. Создаём задачу и привязываем к УЖЕ СОХРАНЁННОМУ состоянию
         TaskEntity task = TaskEntity.builder()
                 .name(name)
                 .description(description)
@@ -95,7 +93,7 @@ public class TaskService {
                 .deadline(deadline)
                 .complexity(complexity != null ? TaskComplexity.valueOf(complexity.toUpperCase()) : null)
                 .priority(priority != null ? TaskPriority.valueOf(priority.toUpperCase()) : null)
-                .taskState(savedState) // 👈 Привязка к только что созданному техническому узлу
+                .taskState(savedNewState) // ✅ используем managed-сущность
                 .build();
 
         return taskRepository.saveAndFlush(task);

@@ -20,6 +20,7 @@ export interface TaskStateUpdate {
 
 export interface Task {
   [x: string]: any;
+//  project_id?: number;
   id: number;
   name: string;
   description: string | null;
@@ -36,8 +37,9 @@ export interface TaskCreate {
     name: string;
     description?: string;
     project_id?: number;
+    task_state_id?: number;
     size_points: number | null;
-    size_category: TaskSizeCategory | null; // 👈
+    size_category: TaskSizeCategory | null;
     deadline: string | null;
     complexity: TaskComplexity | null;
     priority: TaskPriority | null;

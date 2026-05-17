@@ -9,9 +9,10 @@ export const taskApi = {
     getById: (id: number) =>
         apiClient.get<Task>(`/tasks/${id}`),
 
-    create: (data: TaskCreate) =>
-        apiClient.post<Task>('/tasks', null, { params: data }),
-
+    create: (data: TaskCreate) => {
+        console.log('createTaskData:', JSON.stringify(data));
+        return apiClient.post<Task>('/tasks', null, { params: data });
+    },
     update: (id: number, data: TaskUpdate) =>
         apiClient.put<Task>(`/tasks/${id}`, null, { params: { id, ...data } }),
 
@@ -22,6 +23,4 @@ export const taskApi = {
 
     delete: (id: number) =>
         apiClient.delete<Ack>(`/tasks/${id}`),
-
-
 };

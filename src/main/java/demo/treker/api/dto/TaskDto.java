@@ -22,9 +22,12 @@ public class TaskDto {
     String name;
     @JsonProperty("created_at")
     Instant createdAt;
+    @JsonProperty("task_state_id")
+    Long taskStateId;
     String description;
-
+    @JsonProperty("size_points")
     Integer sizePoints;
+    @JsonProperty("size_category")
     TaskSizeCategory sizeCategory;
     @JsonFormat(pattern = "yyyy-MM-dd")
     LocalDate deadline;

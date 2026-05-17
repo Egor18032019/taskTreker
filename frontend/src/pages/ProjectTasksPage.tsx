@@ -11,14 +11,13 @@ import { useWorkflow, useTaskStates } from '../hooks/useTaskStates';
 import type { Task, TaskCreate, TaskSizeCategory, FetchTasksParams } from '../types';
 import { sizeCategoryConfig, complexityConfig, priorityConfig, isDeadlineOverdue } from '../utils/ColorCategoryConfig';
 
-export const TasksPage: React.FC = () => {
+export const ProjectTasksPage: React.FC = () => {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
 
     // 👇 Получаем project_id из URL (если есть)
     const projectIdFromUrl = searchParams.get('project_id');
     const projectId = projectIdFromUrl ? Number(projectIdFromUrl) : undefined;
-
     const [filter, setFilter] = useState('');
     const [open, setOpen] = useState(false);
     const [editing, setEditing] = useState<Task | null>(null);
@@ -32,7 +31,7 @@ export const TasksPage: React.FC = () => {
     // 👇 Форма использует snake_case для API-совместимости
     const [form, setForm] = useState<TaskCreate>({
         name: '', description: '', size_points: undefined, size_category: undefined,
-        deadline: '', complexity: undefined, priority: undefined, project_id: projectId ?? 0,
+        deadline: '', complexity: undefined, priority: undefined, project_id: projectId,
     });
 
     // 👇 Параметры запроса
@@ -84,7 +83,7 @@ export const TasksPage: React.FC = () => {
             deadline: t?.deadline || '',
             complexity: t?.complexity ?? undefined,
             priority: t?.priority ?? undefined,
-            project_id: t?.project_id ?? undefined
+            project_id: t ? t.project_id : projectId
         });
         setOpen(true);
     };
@@ -93,7 +92,7 @@ export const TasksPage: React.FC = () => {
         setOpen(false); setEditing(null); setSelectedTask(null);
         setForm({
             name: '', description: '', size_points: undefined, size_category: undefined,
-            deadline: '', complexity: undefined, priority: undefined, project_id: undefined
+            deadline: '', complexity: undefined, priority: undefined, project_id: projectId
         });
     };
 
@@ -152,12 +151,23 @@ export const TasksPage: React.FC = () => {
     // 🔗 Рендер одной карточки задачи
     const renderTaskCard = (task: Task) => {
         const stateIndex = workflow?.findIndex(s => s.id === task.task_state_id);
-
+const handleCardClick = (e: React.MouseEvent, task: Task) => {
+  // Игнорируем клик, если нажали на кнопку
+  if ((e.target as HTMLElement).closest('button')) return;
+  navigate(`/tasks/${task.id}`);
+};
         return (
-            <Card key={task.id} variant="outlined">
+            <Card key={task.id} variant="outlined"
+              onClick={(e) => handleCardClick(e, task)}
+              sx={{
+                cursor: 'pointer',
+                '&:hover': { borderColor: 'primary.main', boxShadow: 1 }
+              }}
+            >
                 <CardContent>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                        <Typography variant="h6" sx={{ wordBreak: 'break-word' }}>{task.name}</Typography>
+                        <Typography variant="h6"
+                         sx={{ wordBreak: 'break-word' }}>{task.name}</Typography>
                         <Stack direction="row" spacing={0.5}>
                             <IconButton size="small" onClick={() => { setSelectedTask(task); handleOpen(task); }}>
                                 <Edit fontSize="small" />

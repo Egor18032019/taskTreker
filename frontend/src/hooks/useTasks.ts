@@ -9,7 +9,13 @@ export const useTasks = (params?: FetchTasksParams) =>
     queryKey: ['tasks', params],
     queryFn: () => taskApi.fetchAll(params).then(r => r.data),
   });
-
+export const useTask = (id: number) =>
+  useQuery({
+    queryKey: ['tasks', id],
+    queryFn: () => taskApi.getById(id).then(r => r.data),
+    enabled: !!id, // не выполнять запрос, если id = 0
+    staleTime: 1 * 60 * 1000, // 1 минута
+  });
 export const useCreateTask = () => {
   const qc = useQueryClient();
   return useMutation({
