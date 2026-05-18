@@ -28,6 +28,9 @@ public class TaskDtoFactory {
                 .deadline(entity.getDeadline())
                 .priority(entity.getPriority())
                 .complexity(entity.getComplexity())
+                .projectId(entity.getTaskState() != null && entity.getTaskState().getProject() != null
+                        ? entity.getTaskState().getProject().getId()
+                        : null)
                 .build();
     }
 }

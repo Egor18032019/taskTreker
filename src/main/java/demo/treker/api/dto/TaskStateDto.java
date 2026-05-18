@@ -30,6 +30,4 @@ public class TaskStateDto {
     @NonNull
     Long projectId;
 
-    @NonNull
-    List<Long> tasks;
 }

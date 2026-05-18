@@ -33,4 +33,6 @@ public class TaskDto {
     LocalDate deadline;
     TaskComplexity complexity;
     TaskPriority priority;
+    @JsonProperty("project_id")
+    Long projectId;
 }

@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
     Container, Typography, Box, Button, Dialog, DialogTitle, DialogContent,
     DialogActions, TextField, Stack, Card, CardContent, IconButton, Chip,
-    FormControl, InputLabel, Select, MenuItem, FormHelperText
+    FormControl, InputLabel, Select, MenuItem
 } from '@mui/material';
 import { Edit, Delete, ArrowForward, CalendarToday, Sort, GroupWork, ArrowBack } from '@mui/icons-material';
 import { useTasks, useCreateTask, useUpdateTask, useDeleteTask, useTransitionTask } from '../hooks/useTasks';
@@ -108,7 +108,7 @@ export const ProjectTasksPage: React.FC = () => {
 
                 const stateIndex = workflow?.findIndex(s => s.id === task.task_state_id);
                 key = stateIndex !== undefined && stateIndex >= 0
-                    ? `Этап ${stateIndex + 1} (#${task.task_state_id})`
+                    ? `(#${task.task_state_id})`
                     : `State #${task.task_state_id}`;
             }
             acc[key] = acc[key] || [];
@@ -129,7 +129,7 @@ export const ProjectTasksPage: React.FC = () => {
             <Box sx={{ mb: 2, p: 1.5, bgcolor: 'background.paper', borderRadius: 1, border: '1px dashed', borderColor: 'divider' }}>
                 <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
                     <Typography variant="caption" color="text.secondary">
-                        🔄 {currentState ? `Этап ${currentStateIndex + 1} (#${currentState.id})` : 'Без состояния'}
+                        🔄 {currentState ? `Этап1 ${currentStateIndex + 1} (#${currentState.id})` : 'Без состояния'}
                     </Typography>
                     {nextStateId && nextState && (
                         <Button
@@ -140,7 +140,7 @@ export const ProjectTasksPage: React.FC = () => {
                             disabled={transitionMut.isPending}
                             sx={{ ml: 'auto' }}
                         >
-                            → Этап {workflow.findIndex(s => s.id === nextStateId) + 1}
+                            → Этап2 {workflow.findIndex(s => s.id === nextStateId) + 1}
                         </Button>
                     )}
                 </Stack>
@@ -150,24 +150,25 @@ export const ProjectTasksPage: React.FC = () => {
 
     // 🔗 Рендер одной карточки задачи
     const renderTaskCard = (task: Task) => {
-        const stateIndex = workflow?.findIndex(s => s.id === task.task_state_id);
-const handleCardClick = (e: React.MouseEvent, task: Task) => {
-  // Игнорируем клик, если нажали на кнопку
-  if ((e.target as HTMLElement).closest('button')) return;
-  navigate(`/tasks/${task.id}`);
-};
+        const handleCardClick = (e: React.MouseEvent, task: Task) => {
+            // Игнорируем клик, если нажали на кнопку
+            if ((e.target as HTMLElement).closest('button')) return;
+            navigate(`/tasks/${task.id}`, {
+                state: { fromProjectId: projectId }
+            });
+        };
         return (
             <Card key={task.id} variant="outlined"
-              onClick={(e) => handleCardClick(e, task)}
-              sx={{
-                cursor: 'pointer',
-                '&:hover': { borderColor: 'primary.main', boxShadow: 1 }
-              }}
+                onClick={(e) => handleCardClick(e, task)}
+                sx={{
+                    cursor: 'pointer',
+                    '&:hover': { borderColor: 'primary.main', boxShadow: 1 }
+                }}
             >
                 <CardContent>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                         <Typography variant="h6"
-                         sx={{ wordBreak: 'break-word' }}>{task.name}</Typography>
+                            sx={{ wordBreak: 'break-word' }}>{task.name}</Typography>
                         <Stack direction="row" spacing={0.5}>
                             <IconButton size="small" onClick={() => { setSelectedTask(task); handleOpen(task); }}>
                                 <Edit fontSize="small" />
@@ -223,14 +224,11 @@ const handleCardClick = (e: React.MouseEvent, task: Task) => {
                                 variant={isDeadlineOverdue(task.deadline) ? 'filled' : 'outlined'}
                             />
                         )}
-                        {task.task_state_id && projectId && (
-                            <Chip
-                                label={stateIndex !== undefined && stateIndex >= 0
-                                    ? `#${task.task_state_id} • Этап ${stateIndex + 1}`
-                                    : `#${task.task_state_id}`}
-                                size="small" color="primary" variant="outlined"
-                                sx={{ fontWeight: 500 }}
-                            />
+                        {task.size_points > 0 && (
+                            <div>{task.size_points}</div>
+
+                            //todo показывать список или просто кол-во ?
+
                         )}
                     </Stack>
                 </CardContent>
@@ -315,33 +313,7 @@ const handleCardClick = (e: React.MouseEvent, task: Task) => {
                 </Stack>
             </Box>
 
-            {/* Воркфлоу проекта (если есть) — отображаем только ID и порядковый номер */}
-            {projectId && workflow && workflow.length > 0 && (
-                <Box sx={{ mb: 3, p: 2, bgcolor: 'background.paper', borderRadius: 1, border: '1px solid', borderColor: 'divider' }}>
-                    <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>
-                        🔄 Воркфлоу проекта
-                    </Typography>
-                    <Stack direction="row" spacing={1} sx={{ overflowX: 'auto', pb: 0.5 }}>
-                        {workflow.map((state, idx) => (
-                            <React.Fragment key={state.id}>
-                                <Chip
-                                    label={`#${state.id}`}
-                                    size="small"
-                                    color="default"
-                                    variant="outlined"
-                                    sx={{ fontWeight: 500 }}
-                                />
-                                {state.rightTaskStateId && idx < workflow.length - 1 && (
-                                    <ArrowForward fontSize="small" sx={{ color: 'text.disabled' }} />
-                                )}
-                            </React.Fragment>
-                        ))}
-                    </Stack>
-                    <FormHelperText sx={{ mt: 1 }}>
-                        Порядок определяется связями: первый → второй → ... → последний
-                    </FormHelperText>
-                </Box>
-            )}
+
 
             {/* Список задач */}
             <Stack spacing={2}>

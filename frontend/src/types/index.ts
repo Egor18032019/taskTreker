@@ -24,7 +24,7 @@ export interface Task {
   id: number;
   name: string;
   description: string | null;
-  createdAt: string;
+  created_at: string;
   task_state_id: number | null;
   size_points: number | null;
   size_category: TaskSizeCategory | null;

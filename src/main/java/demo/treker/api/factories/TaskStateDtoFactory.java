@@ -26,9 +26,7 @@ public class TaskStateDtoFactory {
                 .rightTaskStateId(entity.getRightTaskState().isPresent() ? entity.getRightTaskState().get().getId() : null)
                 .createdAt(entity.getCreatedAt())
                 .projectId(entity.getProject().getId())
-                .tasks(entity.getTasks() != null ? entity.getTasks().stream()
-                        .map(TaskEntity::getId)
-                        .collect(Collectors.toList()) : List.of())
+
                 .build();
     }
 

@@ -157,6 +157,7 @@ public class TaskStateService {
                 throw new BadRequestException("Workflow cycle detected for project " + projectId);
             }
             chain.add(current);
+            if(current.getRightTaskState().isEmpty())break;
             current = current.getRightTaskState().get();
             iterations++;
         }

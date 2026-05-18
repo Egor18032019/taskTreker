@@ -165,12 +165,57 @@ public class TaskService {
         return taskRepository.saveAndFlush(task);
     }
 
-    //todo перелинковка состояний TaskStateEntity
+    @Transactional
     public void deleteTask(Long taskId) {
-        if (!taskRepository.existsById(taskId)) {
-            throw new NotFoundException(String.format("Task with id \"%s\" doesn't exist.", taskId));
-        }
+        // 1. Проверяем существование задачи
+        TaskEntity task = taskRepository.findById(taskId)
+                .orElseThrow(() -> new NotFoundException(
+                        String.format("Task with id \"%s\" doesn't exist.", taskId)));
+
+        // 2. Сохраняем ссылку на состояние задачи (до удаления)
+        TaskStateEntity taskState = task.getTaskState();
+
+        // 3. 🔥 УДАЛЯЕМ ЗАДАЧУ (orphanRemoval в TaskState не затронет состояние, т.к. связь @ManyToOne)
         taskRepository.deleteById(taskId);
+
+        // 4. Если у задачи было техническое состояние — удаляем его с перелинковкой
+        if (taskState != null) {
+            relinkAndDeleteTaskState(taskState.getId());
+        }
+    }
+
+    /**
+     * 🔗 Удаляет TaskState с перелинковкой соседей в воркфлоу
+     */
+    private void relinkAndDeleteTaskState(Long stateId) {
+        TaskStateEntity state = taskStateRepository.findById(stateId).orElse(null);
+        if (state == null) return; // уже удалено или не найдено
+        // 🔒 Проверка: нет ли других задач в этом состоянии ???
+
+        TaskStateEntity left = state.getLeftTaskState().orElse(null);
+        TaskStateEntity right = state.getRightTaskState().orElse(null);
+
+        // 🔗 Перелинковка: левый и правый соседи соединяются напрямую
+        if (left != null && right != null) {
+            // Оба соседа существуют: left → right
+            left.setRightTaskState(right);
+            right.setLeftTaskState(left);
+            taskStateRepository.saveAllAndFlush(List.of(left, right));
+
+        } else if (left != null) {
+            // Только левый: он становится новым хвостом
+            left.setRightTaskState(null);
+            taskStateRepository.saveAndFlush(left);
+
+        } else if (right != null) {
+            // Только правый: он становится новой головой
+            right.setLeftTaskState(null);
+            taskStateRepository.saveAndFlush(right);
+        }
+        // Если оба null — состояние было единственным, просто удаляем
+
+        // 5. 🔥 Удаляем само состояние
+        taskStateRepository.deleteById(stateId);
     }
 
     public TaskEntity getTaskOrThrow(Long taskId) {

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import {
     Container, Typography, Box, Button, Stack, Card, CardContent,
     Chip, IconButton, Divider, Alert, CircularProgress,
@@ -15,8 +15,10 @@ import { sizeCategoryConfig, complexityConfig, priorityConfig, isDeadlineOverdue
 export const TaskDetailPage: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
+    const location = useLocation();
     const taskId = id ? Number(id) : null;
-
+    // Получаем project_id: либо из state, либо (резерв) из задачи
+    const projectIdFromState = (location.state as any)?.fromProjectId;
     const { data: task, isLoading, error } = useTask(taskId ?? 0);
     const { data: workflow } = useWorkflow(task?.project_id ?? 0);
 
@@ -57,7 +59,13 @@ export const TaskDetailPage: React.FC = () => {
         if (!taskId) return;
         if (window.confirm('Удалить эту задачу?')) {
             deleteMut.mutate(taskId, {
-                onSuccess: () => navigate(`/tasks?project_id=${task?.project_id ?? ''}`),
+                onSuccess: () => {
+                    if (task?.project_id) {
+                        navigate(`/tasks?project_id=${task.project_id}`);
+                    } else {
+                        navigate('/tasks');
+                    }
+                }
             });
         }
     };
@@ -77,7 +85,10 @@ export const TaskDetailPage: React.FC = () => {
             });
         }
     };
-
+    const handleBack = () => {
+        const projectId = projectIdFromState || task?.project_id;
+        navigate(projectId ? `/tasks?project_id=${projectId}` : '/tasks');
+    };
     // Пока загрузка или ошибка
     if (isLoading) {
         return (
@@ -104,16 +115,16 @@ export const TaskDetailPage: React.FC = () => {
     // Позиция в воркфлоу
     const workflowIndex = workflow?.findIndex(s => s.id === task.task_state_id) ?? -1;
     const currentStateLabel = workflowIndex >= 0 ? `Этап ${workflowIndex + 1}` : 'Без состояния';
-
+    console.log("Текущее состояние:", JSON.stringify(currentStateLabel));
+    console.log("workflow", JSON.stringify(workflow));
+    console.log("workflowIndex", JSON.stringify(workflowIndex));
+    console.log(workflow && workflowIndex >= 0 && workflowIndex <= workflow.length - 1);
     return (
         <Container maxWidth="md" sx={{ py: 4 }}>
             {/* Хедер с навигацией */}
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <IconButton
-                        onClick={() => navigate(`/tasks?project_id=${task.project_id ?? ''}`)}
-                        size="small"
-                    >
+                    <IconButton onClick={handleBack} size="small">
                         <ArrowBack />
                     </IconButton>
                     <Typography variant="h4">
@@ -145,6 +156,34 @@ export const TaskDetailPage: React.FC = () => {
             {/* Карточка задачи */}
             <Card variant="outlined">
                 <CardContent sx={{ '& > *': { mb: 2 } }}>
+                    {/* 🔗 Состояние / воркфлоу */}
+                    <Box>
+                        <Stack direction="row" spacing={1}
+                            sx={{ flexWrap: "wrap", alignItems: "center" }}>
+                            <Chip
+                                label={`#${task.task_state_id} • ${currentStateLabel}`}
+                                color="primary"
+                                variant="outlined"
+                                size="small"
+                            />
+                            {workflow && workflowIndex >= 0 && workflowIndex < workflow.length - 1 && (
+                                <Chip
+                                    label={`→ Следующий: #${workflow[workflowIndex + 1].id}`}
+                                    size="small"
+                                    variant="outlined"
+                                    sx={{ cursor: 'pointer' }}
+                                    onClick={() => {
+                                        if (task.id && workflow[workflowIndex + 1].id) {
+                                            updateMut.mutate({
+                                                id: task.id,
+                                                data: { task_state_id: workflow[workflowIndex + 1].id }
+                                            });
+                                        }
+                                    }}
+                                />
+                            )}
+                        </Stack>
+                    </Box>
 
                     {/* Название */}
                     {isEditing ? (
@@ -179,37 +218,7 @@ export const TaskDetailPage: React.FC = () => {
 
                     <Divider />
 
-                    {/* 🔗 Состояние / воркфлоу */}
-                    <Box>
-                        <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                            🔄 Состояние (воркфлоу)
-                        </Typography>
-                        <Stack direction="row" spacing={1}
-                            sx={{ flexWrap: "wrap", alignItems: "center" }}>
-                            <Chip
-                                label={`#${task.task_state_id} • ${currentStateLabel}`}
-                                color="primary"
-                                variant="outlined"
-                                size="small"
-                            />
-                            {workflow && workflowIndex >= 0 && workflowIndex < workflow.length - 1 && (
-                                <Chip
-                                    label={`→ Следующий: #${workflow[workflowIndex + 1].id}`}
-                                    size="small"
-                                    variant="outlined"
-                                    sx={{ cursor: 'pointer' }}
-                                    onClick={() => {
-                                        if (task.id && workflow[workflowIndex + 1].id) {
-                                            updateMut.mutate({
-                                                id: task.id,
-                                                data: { task_state_id: workflow[workflowIndex + 1].id }
-                                            });
-                                        }
-                                    }}
-                                />
-                            )}
-                        </Stack>
-                    </Box>
+
 
                     {/* 📏 Размер */}
                     <Box>
@@ -308,7 +317,7 @@ export const TaskDetailPage: React.FC = () => {
                                 <strong>ID:</strong> {task.id}
                             </Typography>
                             <Typography variant="body2">
-                                <strong>Создана:</strong> {new Date(task.createdAt).toLocaleString('ru-RU')}
+                                <strong>Создана:</strong> {new Date(task.created_at).toLocaleString('ru-RU')}
                             </Typography>
                             {task.project_id && (
                                 <Typography variant="body2">

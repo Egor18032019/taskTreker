@@ -27,7 +27,6 @@ public class TaskStateEntity {
         }
     }
 
-
     @Id
     @GeneratedValue(strategy = GenerationType.SEQUENCE)
     Long id;
