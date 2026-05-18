@@ -1,11 +1,14 @@
 package demo.treker.service;
 
+import demo.treker.api.dto.ChecklistItemDto;
+import demo.treker.api.dto.TaskPatchRequestDto;
 import demo.treker.api.dto.TaskRequestDto;
 import demo.treker.api.exceptoins.BadRequestException;
 import demo.treker.api.exceptoins.NotFoundException;
 import demo.treker.enums.TaskComplexity;
 import demo.treker.enums.TaskPriority;
 import demo.treker.enums.TaskSizeCategory;
+import demo.treker.store.entities.ChecklistItemEntity;
 import demo.treker.store.entities.ProjectEntity;
 import demo.treker.store.entities.TaskEntity;
 import demo.treker.store.entities.TaskStateEntity;
@@ -13,6 +16,8 @@ import demo.treker.store.repositories.ProjectRepository;
 import demo.treker.store.repositories.TaskRepository;
 import demo.treker.store.repositories.TaskStateRepository;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Map;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -53,7 +58,7 @@ public class TaskService {
 
     @Transactional
     public TaskEntity createTask(String name, String description, Long projectId,
-            Integer sizePoints, String sizeCategory, LocalDate deadline,
+            List<ChecklistItemDto> checklist, TaskSizeCategory sizeCategory, LocalDate deadline,
             String complexity, String priority) {
 
         if (name == null || name.trim().isEmpty()) {
@@ -88,81 +93,75 @@ public class TaskService {
         TaskEntity task = TaskEntity.builder()
                 .name(name)
                 .description(description)
-                .sizePoints(sizePoints)
-                .sizeCategory(sizeCategory != null ? TaskSizeCategory.valueOf(sizeCategory.toUpperCase()) : null)
+                .sizeCategory(sizeCategory)
                 .deadline(deadline)
                 .complexity(complexity != null ? TaskComplexity.valueOf(complexity.toUpperCase()) : null)
                 .priority(priority != null ? TaskPriority.valueOf(priority.toUpperCase()) : null)
                 .taskState(savedNewState) // ✅ используем managed-сущность
                 .build();
 
+        // Добавляем чек-лист
+        if (checklist != null) {
+            for (int i = 0; i < checklist.size(); i++) {
+                ChecklistItemDto dto = checklist.get(i);
+                ChecklistItemEntity item = ChecklistItemEntity.builder()
+                        .text(dto.getText()).completed(dto.isCompleted()).orderIndex(i).build();
+                task.addChecklistItem(item);
+            }
+        }
         return taskRepository.saveAndFlush(task);
     }
 
-    public TaskEntity updateTask(Long taskId, TaskRequestDto request) {
-        TaskEntity task = taskRepository.findById(taskId)
-                .orElseThrow(() -> new NotFoundException(
-                        String.format("Task with id \"%s\" doesn't exist.", taskId)));
 
 
-        if (request.getName() != null && !request.getName().isBlank()) {
-            task.setName(request.getName());
-        }
-        if (request.getDescription() != null) {
-            task.setDescription(request.getDescription());
-        }
-        if (request.getTaskStateId() != null) {
-            TaskStateEntity state = taskStateRepository.findById(request.getTaskStateId())
-                    .orElseThrow(() -> new NotFoundException(
-                            String.format("TaskState with id \"%s\" doesn't exist.", request.getTaskStateId())));
-            task.setTaskState(state);
-        }
-        if (request.getSizePoints() != null) {
-            task.setSizePoints(request.getSizePoints());
-        }
-        if (request.getSizeCategory() != null) {
-            // желательно проверить, что категория допустима (например, из enum)
-            task.setSizeCategory(TaskSizeCategory.valueOf(request.getSizeCategory()));
-        }
-        if (request.getDeadline() != null) {
-            task.setDeadline(request.getDeadline());
-        }
-        if (request.getComplexity() != null) {
-            task.setComplexity(TaskComplexity.valueOf(request.getComplexity()));
-        }
-        if (request.getPriority() != null) {
-            task.setPriority(TaskPriority.valueOf(request.getPriority()));
-        }
-
-        return taskRepository.save(task);
-    }
-
-    public TaskEntity updateTask(Long taskId, String name, String description, Long taskStateId,
-            Integer sizePoints, String sizeCategory, LocalDate deadline,
+    public TaskEntity updateTask(Long taskId, String name, String description,TaskSizeCategory sizeCategory,
+            List<ChecklistItemDto> checklist, LocalDate deadline,
             String complexity, String priority) {
 
-        TaskEntity task = taskRepository.findById(taskId)
-                .orElseThrow(() -> new NotFoundException(
-                        String.format("Task with id \"%s\" doesn't exist.", taskId)));
+        TaskEntity task = getTaskOrThrow(taskId);
 
-        if (name != null && !name.trim().isEmpty()) {
-            task.setName(name);
-        }
-        if (description != null) {
-            task.setDescription(description);
-        }
-        if (taskStateId != null) {
-            TaskStateEntity state = taskStateRepository.findById(taskStateId)
-                    .orElseThrow(() -> new NotFoundException(
-                            String.format("TaskState with id \"%s\" doesn't exist.", taskStateId)));
-            task.setTaskState(state);
-        }
-        if (sizePoints != null) task.setSizePoints(sizePoints);
-        if (sizeCategory != null) task.setSizeCategory(TaskSizeCategory.valueOf(sizeCategory.toUpperCase()));
+        if (name != null && !name.trim().isEmpty()) task.setName(name);
+        if (description != null) task.setDescription(description);
+        if (sizeCategory != null) task.setSizeCategory(sizeCategory);
         if (deadline != null) task.setDeadline(deadline);
         if (complexity != null) task.setComplexity(TaskComplexity.valueOf(complexity.toUpperCase()));
         if (priority != null) task.setPriority(TaskPriority.valueOf(priority.toUpperCase()));
+
+        // 🔥 Синхронизируем чек-лист (обновляем/добавляем/удаляем)
+        if (checklist != null) syncChecklist(task, checklist);
+
         return taskRepository.saveAndFlush(task);
+    }
+
+    //   умная синхронизация чек-листа
+    private void syncChecklist(TaskEntity task, List<ChecklistItemDto> newItems) {
+        Map<Long, ChecklistItemDto> newMap = newItems.stream()
+                .filter(i -> i.getId() != null)
+                .collect(Collectors.toMap(ChecklistItemDto::getId, i -> i));
+
+        List<ChecklistItemEntity> toRemove = new ArrayList<>();
+        for (ChecklistItemEntity existing : task.getChecklist()) {
+            ChecklistItemDto updated = newMap.get(existing.getId());
+            if (updated != null) {
+                existing.setText(updated.getText());
+                existing.setCompleted(updated.isCompleted());
+                existing.setOrderIndex(updated.getOrderIndex());
+                newMap.remove(existing.getId()); // помечаем как обработанный
+            } else {
+                toRemove.add(existing); // больше нет в запросе → удалить
+            }
+        }
+        task.getChecklist().removeAll(toRemove);
+
+        // Добавляем новые элементы
+        for (ChecklistItemDto item : newItems) {
+            if (item.getId() == null) {
+                ChecklistItemEntity newEntity = ChecklistItemEntity.builder()
+                        .text(item.getText()).completed(item.isCompleted())
+                        .orderIndex(item.getOrderIndex()).build();
+                task.addChecklistItem(newEntity);
+            }
+        }
     }
 
     @Transactional
@@ -319,5 +318,58 @@ public class TaskService {
 
         task.setTaskState(targetState);
         return taskRepository.saveAndFlush(task);
+    }
+
+
+    public TaskEntity patchTask(Long taskId, TaskPatchRequestDto patch) {
+        TaskEntity task = taskRepository.findById(taskId)
+                .orElseThrow(() -> new NotFoundException("Task not found with id=" + taskId));
+
+        // Обновление простых полей (только если они не null)
+        if (patch.getName() != null && !patch.getName().isBlank()) {
+            task.setName(patch.getName());
+        }
+        if (patch.getDescription() != null) {
+            task.setDescription(patch.getDescription());
+        }
+        if (patch.getTaskStateId() != null) {
+            TaskStateEntity state = taskStateService.findById(patch.getTaskStateId());
+            task.setTaskState(state);
+        }
+        if (patch.getSizeCategory() != null) {
+            task.setSizeCategory(patch.getSizeCategory());
+        }
+        if (patch.getDeadline() != null) {
+            task.setDeadline(patch.getDeadline());
+        }
+        if (patch.getComplexity() != null) {
+            task.setComplexity(patch.getComplexity());
+        }
+        if (patch.getPriority() != null) {
+            task.setPriority(patch.getPriority());
+        }
+        // Если size_points тоже нужно обновлять – добавь поле в TaskPatchRequest и здесь
+
+        // === Обработка чеклиста ===
+        if (patch.getCheckList() != null) {
+            // 1. Удаляем все старые пункты из коллекции
+            //    Благодаря orphanRemoval = true, они будут удалены из БД при сохранении
+            task.getChecklist().clear();
+
+            // 2. Создаём новые пункты из DTO и добавляем через вспомогательный метод
+            //    orderIndex лучше брать из DTO, чтобы фронтенд управлял порядком
+            patch.getCheckList().forEach(dto -> {
+                ChecklistItemEntity item = ChecklistItemEntity.builder()
+                        .text(dto.getText())
+                        .completed(dto.isCompleted())
+                        .orderIndex(dto.getOrderIndex())
+                        .task(task)   // можно передать здесь, но addChecklistItem сделает это сам
+                        .build();
+                task.addChecklistItem(item);  // используем хелпер для двусторонней связи
+            });
+        }
+
+        // 3. Сохраняем задачу – каскадные операции обновят/удалят/вставят пункты чеклиста
+        return taskRepository.save(task);
     }
 }

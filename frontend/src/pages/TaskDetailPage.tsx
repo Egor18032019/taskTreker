@@ -9,8 +9,9 @@ import {
 import { ArrowBack, Edit, Delete, CalendarToday, BarChart, Grade, PriorityHigh } from '@mui/icons-material';
 import { useTask, useUpdateTask, useDeleteTask } from '../hooks/useTasks';
 import { useWorkflow } from '../hooks/useTaskStates';
-import type { TaskUpdate } from '../types';
+import type { TaskUpdate, ChecklistItem } from '../types';
 import { sizeCategoryConfig, complexityConfig, priorityConfig, isDeadlineOverdue } from '../utils/ColorCategoryConfig';
+import { Checklist } from '../components/Checklist';
 
 export const TaskDetailPage: React.FC = () => {
     const { id } = useParams<{ id: string }>();
@@ -26,7 +27,9 @@ export const TaskDetailPage: React.FC = () => {
     const deleteMut = useDeleteTask();
 
     const [isEditing, setIsEditing] = useState(false);
-    const [form, setForm] = useState<TaskUpdate>({});
+    const [form, setForm] = useState<TaskUpdate>({
+        check_list: [],
+    });
 
     // Заполняем форму при входе в режим редактирования
     useEffect(() => {
@@ -35,7 +38,12 @@ export const TaskDetailPage: React.FC = () => {
                 name: task.name,
                 description: task.description ?? undefined,
                 task_state_id: task.task_state_id ?? undefined,
-                size_points: task.size_points ?? undefined,
+                check_list: task.check_list?.map(item => ({
+                    id: item.id,
+                    text: item.text,
+                    completed: item.completed,
+                    orderIndex: item.orderIndex,
+                })) ?? [],
                 size_category: task.size_category ?? undefined,
                 deadline: task.deadline ?? undefined,
                 complexity: task.complexity ?? undefined,
@@ -77,7 +85,12 @@ export const TaskDetailPage: React.FC = () => {
                 name: task.name,
                 description: task.description ?? undefined,
                 task_state_id: task.task_state_id ?? undefined,
-                size_points: task.size_points ?? undefined,
+                check_list: task.check_list?.map(item => ({
+                    id: item.id,
+                    text: item.text,
+                    completed: item.completed,
+                    orderIndex: item.orderIndex,
+                })) ?? [],
                 size_category: task.size_category ?? undefined,
                 deadline: task.deadline ?? undefined,
                 complexity: task.complexity ?? undefined,
@@ -218,8 +231,6 @@ export const TaskDetailPage: React.FC = () => {
 
                     <Divider />
 
-
-
                     {/* 📏 Размер */}
                     <Box>
                         <Typography variant="subtitle2" color="text.secondary" gutterBottom>
@@ -237,20 +248,30 @@ export const TaskDetailPage: React.FC = () => {
                         )}
                     </Box>
 
-                    {/* Поинты */}
-                    <Box>
-                        <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                            <BarChart fontSize="small" sx={{ verticalAlign: 'middle', mr: 0.5 }} />
-                            Save points
-                        </Typography>
-
-                        {task.size_points ? (
-                            <Chip label={`📏 ${task.size_points} story points`} size="small" variant="outlined" />
-                        ) : (
-                            <Typography variant="body2" color="text.disabled">Не задан</Typography>
-                        )}
-
-                    </Box>
+           <Divider />
+           {/* 📋 Чек-лист */}
+           <Box>
+               <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                   📋 Чек-лист задач
+               </Typography>
+               {isEditing ? (
+                   <Checklist
+                       items={form.check_list || []}
+                       onChange={(items: ChecklistItem[]) => setForm(p => ({ ...p, check_list: items }))}
+                       editable={true}
+                   />
+               ) : task.check_list?.length ? (
+                   <Checklist
+                       items={task.check_list}
+                      onChange={(items: ChecklistItem[]) => {
+                                  updateMut.mutate({ id: task.id, data: { check_list: items } });
+                              }}
+                       editable={false}
+                   />
+               ) : (
+                   <Typography variant="body2" color="text.disabled">Чек-лист пуст</Typography>
+               )}
+           </Box>
 
                     {/* ⚙️ Сложность */}
                     <Box>

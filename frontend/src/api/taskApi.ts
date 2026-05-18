@@ -11,10 +11,10 @@ export const taskApi = {
 
     create: (data: TaskCreate) => {
         console.log('createTaskData:', JSON.stringify(data));
-        return apiClient.post<Task>('/tasks', null, { params: data });
+        return apiClient.post<Task>('/tasks', data);
     },
     update: (id: number, data: TaskUpdate) =>
-        apiClient.put<Task>(`/tasks/${id}`, null, { params: { id, ...data } }),
+        apiClient.put<Task>(`/tasks/${id}`, data),
 
     transition: (taskId: number, toStateId: number) =>
         apiClient.post<Task>(`/tasks/${taskId}/transition`, null, {

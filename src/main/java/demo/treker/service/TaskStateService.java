@@ -191,4 +191,8 @@ public class TaskStateService {
         return (from.getRightTaskState() != null && from.getRightTaskState().get().getId().equals(toStateId)) ||
                 (from.getLeftTaskState() != null && from.getLeftTaskState().get().getId().equals(toStateId));
     }
+
+    public TaskStateEntity findById(Long taskStateId) {
+        return taskStateRepository.getById(taskStateId);
+    }
 }

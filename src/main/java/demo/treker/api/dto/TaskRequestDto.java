@@ -1,6 +1,8 @@
 package demo.treker.api.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import demo.treker.enums.TaskSizeCategory;
+import java.util.List;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
@@ -21,12 +23,13 @@ public class TaskRequestDto {
 
     @JsonProperty("task_state_id")
     Long taskStateId;
-
-    @JsonProperty("size_points")
-    Integer sizePoints;
+    @JsonProperty("project_id")
+    Long projectId;
+    @JsonProperty("check_list")
+    List<ChecklistItemDto> checkList;
 
     @JsonProperty("size_category")
-    String sizeCategory;
+    TaskSizeCategory sizeCategory;
 
     @JsonProperty("deadline")
     LocalDate deadline;

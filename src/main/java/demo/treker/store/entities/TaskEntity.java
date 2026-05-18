@@ -4,6 +4,8 @@ import demo.treker.enums.TaskComplexity;
 import demo.treker.enums.TaskPriority;
 import demo.treker.enums.TaskSizeCategory;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
@@ -30,8 +32,7 @@ public class TaskEntity {
 
     String description;
 
-    @Column(name = "size_points")
-    Integer sizePoints;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "size_category")
     TaskSizeCategory sizeCategory;
@@ -46,4 +47,14 @@ public class TaskEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "task_state_id", referencedColumnName = "id")
     TaskStateEntity taskState;
+
+    @OneToMany(mappedBy = "task", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+    @OrderBy("orderIndex ASC")
+    @Builder.Default
+    List<ChecklistItemEntity> checklist = new ArrayList<>();
+
+    public void addChecklistItem(ChecklistItemEntity item) {
+        checklist.add(item);
+        item.setTask(this);
+    }
 }

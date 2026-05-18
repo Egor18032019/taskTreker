@@ -3,13 +3,15 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
     Container, Typography, Box, Button, Dialog, DialogTitle, DialogContent,
     DialogActions, TextField, Stack, Card, CardContent, IconButton, Chip,
-    FormControl, InputLabel, Select, MenuItem
+    FormControl, InputLabel, Select, MenuItem,
+    FormHelperText
 } from '@mui/material';
 import { Edit, Delete, ArrowForward, CalendarToday, Sort, GroupWork, ArrowBack } from '@mui/icons-material';
 import { useTasks, useCreateTask, useUpdateTask, useDeleteTask, useTransitionTask } from '../hooks/useTasks';
 import { useWorkflow, useTaskStates } from '../hooks/useTaskStates';
-import type { Task, TaskCreate, TaskSizeCategory, FetchTasksParams } from '../types';
+import type { Task, TaskCreate, TaskSizeCategory, FetchTasksParams, ChecklistItem } from '../types';
 import { sizeCategoryConfig, complexityConfig, priorityConfig, isDeadlineOverdue } from '../utils/ColorCategoryConfig';
+import { Checklist } from '../components/Checklist';
 
 export const ProjectTasksPage: React.FC = () => {
     const navigate = useNavigate();
@@ -30,7 +32,7 @@ export const ProjectTasksPage: React.FC = () => {
 
     // 👇 Форма использует snake_case для API-совместимости
     const [form, setForm] = useState<TaskCreate>({
-        name: '', description: '', size_points: undefined, size_category: undefined,
+        name: '', description: '', check_list: [], size_category: undefined,
         deadline: '', complexity: undefined, priority: undefined, project_id: projectId,
     });
 
@@ -78,7 +80,12 @@ export const ProjectTasksPage: React.FC = () => {
         setEditing(t || null);
         setForm({
             name: t?.name || '', description: t?.description || '',
-            size_points: t?.size_points ?? undefined,
+            check_list: t?.check_list?.map(item => ({
+                id: item.id,
+                text: item.text,
+                completed: item.completed,
+                orderIndex: item.orderIndex,
+            })) ?? [],
             size_category: t?.size_category ?? undefined,
             deadline: t?.deadline || '',
             complexity: t?.complexity ?? undefined,
@@ -91,7 +98,7 @@ export const ProjectTasksPage: React.FC = () => {
     const handleClose = () => {
         setOpen(false); setEditing(null); setSelectedTask(null);
         setForm({
-            name: '', description: '', size_points: undefined, size_category: undefined,
+            name: '', description: '', check_list: [], size_category: undefined,
             deadline: '', complexity: undefined, priority: undefined, project_id: projectId
         });
     };
@@ -103,7 +110,6 @@ export const ProjectTasksPage: React.FC = () => {
             let key = 'Unspecified';
             if (groupBy === 'priority' && task.priority) key = task.priority;
             else if (groupBy === 'complexity' && task.complexity) key = task.complexity;
-            else if (groupBy === 'size_category' && task.size_category) key = task.size_category;
             else if (groupBy === 'task_state_id' && task.task_state_id) {
 
                 const stateIndex = workflow?.findIndex(s => s.id === task.task_state_id);
@@ -196,9 +202,34 @@ export const ProjectTasksPage: React.FC = () => {
                                 size="small" color={sizeCategoryConfig[task.size_category].color} variant="outlined"
                             />
                         )}
-                        {task.size_points && !task.size_category && (
-                            <Chip label={`📏 ${task.size_points} sp`} size="small" variant="outlined" />
+                        {/* 📋 Превью чек-листа */}
+                        {task.check_list?.length > 0 && (
+                            <Box sx={{ mt: 1, p: 1, bgcolor: 'background.default', borderRadius: 1 }}>
+                                <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
+                                    📋 Чек-лист ({task.check_list.filter(i => i.completed).length}/{task.check_list.length})
+                                </Typography>
+                                <Stack direction="row" spacing={0.5} sx={{ flexWrap: 'wrap' }}>
+                                    {task.check_list.slice(0, 3).map((item, idx) => (
+                                        <Chip
+                                            key={item.id || idx}
+                                            label={item.text}
+                                            size="small"
+                                            color={item.completed ? 'success' : 'default'}
+                                            variant={item.completed ? 'filled' : 'outlined'}
+                                            sx={{
+                                                height: 24,
+                                                fontSize: '0.7rem',
+                                                textDecoration: item.completed ? 'line-through' : 'none'
+                                            }}
+                                        />
+                                    ))}
+                                    {task.check_list.length > 3 && (
+                                        <Chip label={`+${task.check_list.length - 3}`} size="small" variant="outlined" />
+                                    )}
+                                </Stack>
+                            </Box>
                         )}
+
                         {task.complexity && (
                             <Chip
                                 label={`${complexityConfig[task.complexity].icon} ${task.complexity.toLowerCase()}`}
@@ -275,7 +306,7 @@ export const ProjectTasksPage: React.FC = () => {
                             <MenuItem value="">Нет</MenuItem>
                             <MenuItem value="priority">Приоритет</MenuItem>
                             <MenuItem value="complexity">Сложность</MenuItem>
-                            <MenuItem value="size_points">Размер (сп)</MenuItem>
+
                             <MenuItem value="size_category">Категория размера</MenuItem>
                             <MenuItem value="deadline">Срок</MenuItem>
                             <MenuItem value="createdAt">Дата создания</MenuItem>
@@ -363,73 +394,79 @@ export const ProjectTasksPage: React.FC = () => {
 
 
                         {/* Размер: Points + Category */}
-                        <Stack direction="row" spacing={2}>
-                            <TextField label="Story points" type="number" fullWidth
-                                value={form.size_points ?? ''}
-                                onChange={e => setForm(p => ({ ...p, size_points: e.target.value ? Number(e.target.value) : undefined }))}
-                                slotProps={{
-                                    htmlInput: { min: 1, max: 13 },  // нативные <input> атрибуты
-                                }}
+                        {/* 📋 Чек-лист задач */}
+                        <FormControl fullWidth>
+                            <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                                📋 Чек-лист задач
+                            </Typography>
+                            <Checklist
+                                items={form.check_list || []}
+                                onChange={(items: ChecklistItem[]) => setForm(p => ({ ...p, check_list: items }))}
+                                editable={true}
                             />
-                            <FormControl fullWidth>
-                                <InputLabel>Категория</InputLabel>
-                                <Select
-                                    value={form.size_category || ''} label="Категория"
-                                    onChange={e => setForm(p => ({ ...p, size_category: (e.target.value as TaskSizeCategory) || undefined }))}
-                                >
-                                    <MenuItem value=""><em>Не задано</em></MenuItem>
-                                    {Object.keys(sizeCategoryConfig).map(cat => (
-                                        <MenuItem key={cat} value={cat}>
-                                            {sizeCategoryConfig[cat as TaskSizeCategory].icon} {cat.toLowerCase()}
-                                        </MenuItem>
-                                    ))}
-                                </Select>
-                            </FormControl>
-                        </Stack>
-
-                        {/* Сложность + Приоритет */}
-                        <Stack direction="row" spacing={2}>
-                            <FormControl fullWidth>
-                                <InputLabel>Сложность</InputLabel>
-                                <Select
-                                    value={form.complexity || ''} label="Сложность"
-                                    onChange={e => setForm(p => ({ ...p, complexity: (e.target.value as any) || undefined }))}
-                                >
-                                    <MenuItem value=""><em>Не задано</em></MenuItem>
-                                    {Object.keys(complexityConfig).map(c => (
-                                        <MenuItem key={c} value={c}>
-                                            {complexityConfig[c as any].icon} {c.toLowerCase()}
-                                        </MenuItem>
-                                    ))}
-                                </Select>
-                            </FormControl>
-                            <FormControl fullWidth>
-                                <InputLabel>Приоритет</InputLabel>
-                                <Select
-                                    value={form.priority || ''} label="Приоритет"
-                                    onChange={e => setForm(p => ({ ...p, priority: (e.target.value as any) || undefined }))}
-                                >
-                                    <MenuItem value=""><em>Не задано</em></MenuItem>
-                                    {Object.keys(priorityConfig).map(p => (
-                                        <MenuItem key={p} value={p}>
-                                            <Chip size="small" label={priorityConfig[p as any].label}
-                                                color={priorityConfig[p as any].color} sx={{ height: 20 }} />
-                                        </MenuItem>
-                                    ))}
-                                </Select>
-                            </FormControl>
-                        </Stack>
-
-                        {/* Дедлайн */}
-                        <TextField label="Срок" type="date" fullWidth
-                            value={form.deadline || ''}
-                            onChange={e => setForm(p => ({ ...p, deadline: e.target.value || undefined }))}
-                            slotProps={{
-                                htmlInput: { min: new Date().toISOString().split('T')[0] },
-                                inputLabel: { shrink: true }
-                            }}
-                        />
+                            <FormHelperText>
+                                Добавьте пункты: "Позвонить", "Подготовить документы"... Отмечайте выполненные ✓
+                            </FormHelperText>
+                        </FormControl>
+                        <FormControl fullWidth>
+                            <InputLabel>Категория</InputLabel>
+                            <Select
+                                value={form.size_category || ''} label="Категория"
+                                onChange={e => setForm(p => ({ ...p, size_category: (e.target.value as TaskSizeCategory) || undefined }))}
+                            >
+                                <MenuItem value=""><em>Не задано</em></MenuItem>
+                                {Object.keys(sizeCategoryConfig).map(cat => (
+                                    <MenuItem key={cat} value={cat}>
+                                        {sizeCategoryConfig[cat as TaskSizeCategory].icon} {cat.toLowerCase()}
+                                    </MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
                     </Stack>
+
+                    {/* Сложность + Приоритет */}
+                    <Stack direction="row" spacing={2}>
+                        <FormControl fullWidth>
+                            <InputLabel>Сложность</InputLabel>
+                            <Select
+                                value={form.complexity || ''} label="Сложность"
+                                onChange={e => setForm(p => ({ ...p, complexity: (e.target.value as any) || undefined }))}
+                            >
+                                <MenuItem value=""><em>Не задано</em></MenuItem>
+                                {Object.keys(complexityConfig).map(c => (
+                                    <MenuItem key={c} value={c}>
+                                        {complexityConfig[c as any].icon} {c.toLowerCase()}
+                                    </MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
+                        <FormControl fullWidth>
+                            <InputLabel>Приоритет</InputLabel>
+                            <Select
+                                value={form.priority || ''} label="Приоритет"
+                                onChange={e => setForm(p => ({ ...p, priority: (e.target.value as any) || undefined }))}
+                            >
+                                <MenuItem value=""><em>Не задано</em></MenuItem>
+                                {Object.keys(priorityConfig).map(p => (
+                                    <MenuItem key={p} value={p}>
+                                        <Chip size="small" label={priorityConfig[p as any].label}
+                                            color={priorityConfig[p as any].color} sx={{ height: 20 }} />
+                                    </MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
+                    </Stack>
+
+                    {/* Дедлайн */}
+                    <TextField label="Срок" type="date" fullWidth
+                        value={form.deadline || ''}
+                        onChange={e => setForm(p => ({ ...p, deadline: e.target.value || undefined }))}
+                        slotProps={{
+                            htmlInput: { min: new Date().toISOString().split('T')[0] },
+                            inputLabel: { shrink: true }
+                        }}
+                    />
+
                 </DialogContent>
                 <DialogActions>
                     <Button onClick={handleClose}>Отмена</Button>
@@ -439,6 +476,6 @@ export const ProjectTasksPage: React.FC = () => {
                     </Button>
                 </DialogActions>
             </Dialog>
-        </Container>
+        </Container >
     );
 };

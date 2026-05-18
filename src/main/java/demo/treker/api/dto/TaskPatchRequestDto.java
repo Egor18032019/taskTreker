@@ -1,39 +1,41 @@
 package demo.treker.api.dto;
 
-import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import demo.treker.enums.TaskComplexity;
 import demo.treker.enums.TaskPriority;
 import demo.treker.enums.TaskSizeCategory;
-import java.time.LocalDate;
-import java.util.List;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
-import java.time.Instant;
+import java.time.LocalDate;
+import java.util.List;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
-public class TaskDto {
-    //todo добавить валидацию
-    Long id;
+public class TaskPatchRequestDto {
+    /*
+    Все поля необязательные (клиент передаёт только те, что нужно изменить).
+     Если поле null – оно не меняется
+     (кроме checkList, где null означает «не изменять», а пустой список – «очистить»).
+     */
     String name;
-    @JsonProperty("created_at")
-    Instant createdAt;
+    String description;
+
     @JsonProperty("task_state_id")
     Long taskStateId;
-    String description;
+
     @JsonProperty("check_list")
     List<ChecklistItemDto> checkList;
+
     @JsonProperty("size_category")
     TaskSizeCategory sizeCategory;
-    @JsonFormat(pattern = "yyyy-MM-dd")
+
+    @JsonProperty("deadline")
     LocalDate deadline;
+
     TaskComplexity complexity;
     TaskPriority priority;
-    @JsonProperty("project_id")
-    Long projectId;
 }

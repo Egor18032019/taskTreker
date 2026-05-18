@@ -19,7 +19,7 @@ public class ChecklistItemEntity {
     boolean completed = false;
 
     @Builder.Default
-    int orderIndex = 0;
+    int orderIndex = 0; //todo надо ли ?
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "task_id", nullable = false)
