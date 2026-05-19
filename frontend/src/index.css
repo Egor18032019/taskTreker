@@ -109,3 +109,43 @@ code {
   padding: 4px 8px;
   background: var(--code-bg);
 }
+
+/* Фиксируем ширину календаря под сайдбар */
+.react-calendar {
+  width: 100% !important;
+  border: none !important;
+  font-family: inherit !important;
+}
+
+.react-calendar__navigation button {
+  color: #1976d2;
+  min-width: 44px;
+}
+
+.react-calendar__month-view__days__day {
+  padding: 8px 0 !important;
+}
+
+/* Подсветка дней с задачами */
+.calendar-tile--has-tasks {
+  background: linear-gradient(to bottom, transparent 80%, #1976d2 80%) !important;
+  border-radius: 4px;
+}
+
+.calendar-tile--has-tasks:enabled:hover,
+.calendar-tile--has-tasks:enabled:focus {
+  background: linear-gradient(to bottom, #f5f5f5 80%, #1976d2 80%) !important;
+}
+
+/* Текущий день */
+.react-calendar__tile--now {
+  background: #fff3e0 !important;
+  border-radius: 4px;
+}
+
+/* Выбранный день */
+.react-calendar__tile--active {
+  background: #1976d2 !important;
+  color: white !important;
+  border-radius: 4px;
+}

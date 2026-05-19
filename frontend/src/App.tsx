@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Link,Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Link, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { CssBaseline, AppBar, Toolbar, Typography, Button, Box } from '@mui/material';
@@ -7,6 +7,7 @@ import { ProjectsPage } from './pages/ProjectsPage';
 import { NotificationProvider } from './contexts/NotificationContext';
 import { ProjectTasksPage } from './pages/ProjectTasksPage';
 import { TaskDetailPage } from './pages/TaskDetailPage';
+import { AppLayout } from './components/AppLayout';
 
 const queryClient = new QueryClient({
     defaultOptions: {
@@ -47,8 +48,16 @@ function App() {
                             <Routes>
 
                                 <Route path="/" element={<Navigate to="/projects" replace />} />
-                                <Route path="/projects" element={<ProjectsPage />} />
-                                <Route path="/tasks" element={<ProjectTasksPage />} />
+                                <Route path="/projects" element={
+                                    <AppLayout>
+                                        <ProjectsPage />
+                                    </AppLayout>
+                                } />
+                                <Route path="/tasks" element={
+                                    <AppLayout>
+                                        <ProjectTasksPage />
+                                    </AppLayout>
+                                } />
                                 <Route path="/tasks/:id" element={<TaskDetailPage />} />
                                 <Route path="*" element={<Navigate to="/projects" replace />} />
                             </Routes>

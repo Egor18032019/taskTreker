@@ -51,7 +51,7 @@ export const ProjectsPage: React.FC = () => {
         navigate(`/tasks?project_id=${projectId}`);
     };
     return (
-        <Container maxWidth="md" sx={{ py: 4 }}>
+        <Container maxWidth="md">
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
                 <Typography variant="h4">Проекты</Typography>
                 <Button variant="contained" onClick={() => handleOpen()}>+ Добавить</Button>

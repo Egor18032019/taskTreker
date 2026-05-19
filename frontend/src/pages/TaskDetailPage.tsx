@@ -30,7 +30,11 @@ export const TaskDetailPage: React.FC = () => {
     const [form, setForm] = useState<TaskUpdate>({
         check_list: [],
     });
-
+    const goToNextTask = (nextTaskId?: number) => {
+        if (nextTaskId != null) {
+            navigate(`/tasks/${nextTaskId}`, { state: location.state });
+        }
+    };
     // Заполняем форму при входе в режим редактирования
     useEffect(() => {
         if (task && isEditing) {
@@ -127,10 +131,10 @@ export const TaskDetailPage: React.FC = () => {
 
     // Позиция в воркфлоу
     const workflowIndex = workflow?.findIndex(s => s.id === task.task_state_id) ?? -1;
+
     const currentStateLabel = workflowIndex >= 0 ? `Этап ${workflowIndex + 1}` : 'Без состояния';
-    console.log("Текущее состояние:", JSON.stringify(currentStateLabel));
-    console.log("workflow", JSON.stringify(workflow));
-    console.log("workflowIndex", JSON.stringify(workflowIndex));
+
+
     console.log(workflow && workflowIndex >= 0 && workflowIndex <= workflow.length - 1);
     return (
         <Container maxWidth="md" sx={{ py: 4 }}>
@@ -171,14 +175,36 @@ export const TaskDetailPage: React.FC = () => {
                 <CardContent sx={{ '& > *': { mb: 2 } }}>
                     {/* 🔗 Состояние / воркфлоу */}
                     <Box>
-                        <Stack direction="row" spacing={1}
-                            sx={{ flexWrap: "wrap", alignItems: "center" }}>
+                        <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", alignItems: "center" }}>
                             <Chip
                                 label={`#${task.task_state_id} • ${currentStateLabel}`}
                                 color="primary"
                                 variant="outlined"
                                 size="small"
                             />
+
+                            {/* Предыдущий этап */}
+                            {workflow && workflowIndex > 0 && (
+                                <Chip
+                                    label={`← Предыдущий: #${workflow[workflowIndex - 1].id}`}
+                                    size="small"
+                                    variant="outlined"
+                                    sx={{ cursor: 'pointer' }}
+                                    onClick={() => {
+
+                                        console.log("workflow")
+                                        console.log(workflow)
+                                        console.log("workflowIndex")
+                                        console.log(workflowIndex)
+                                        console.log("task")
+                                        console.log(task)
+                                        goToNextTask(workflow[workflowIndex - 1].id)
+
+                                    }}
+                                />
+                            )}
+
+                            {/* Следующий этап */}
                             {workflow && workflowIndex >= 0 && workflowIndex < workflow.length - 1 && (
                                 <Chip
                                     label={`→ Следующий: #${workflow[workflowIndex + 1].id}`}
@@ -186,12 +212,12 @@ export const TaskDetailPage: React.FC = () => {
                                     variant="outlined"
                                     sx={{ cursor: 'pointer' }}
                                     onClick={() => {
-                                        if (task.id && workflow[workflowIndex + 1].id) {
-                                            updateMut.mutate({
-                                                id: task.id,
-                                                data: { task_state_id: workflow[workflowIndex + 1].id }
-                                            });
-                                        }
+
+                                        goToNextTask(workflow[workflowIndex + 1].id)
+                                        console.log(workflow)
+                                        console.log(workflowIndex)
+                                        console.log(task)
+
                                     }}
                                 />
                             )}
@@ -248,30 +274,30 @@ export const TaskDetailPage: React.FC = () => {
                         )}
                     </Box>
 
-           <Divider />
-           {/* 📋 Чек-лист */}
-           <Box>
-               <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                   📋 Чек-лист задач
-               </Typography>
-               {isEditing ? (
-                   <Checklist
-                       items={form.check_list || []}
-                       onChange={(items: ChecklistItem[]) => setForm(p => ({ ...p, check_list: items }))}
-                       editable={true}
-                   />
-               ) : task.check_list?.length ? (
-                   <Checklist
-                       items={task.check_list}
-                      onChange={(items: ChecklistItem[]) => {
-                                  updateMut.mutate({ id: task.id, data: { check_list: items } });
-                              }}
-                       editable={false}
-                   />
-               ) : (
-                   <Typography variant="body2" color="text.disabled">Чек-лист пуст</Typography>
-               )}
-           </Box>
+                    <Divider />
+                    {/* 📋 Чек-лист */}
+                    <Box>
+                        <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                            📋 Чек-лист задач
+                        </Typography>
+                        {isEditing ? (
+                            <Checklist
+                                items={form.check_list || []}
+                                onChange={(items: ChecklistItem[]) => setForm(p => ({ ...p, check_list: items }))}
+                                editable={true}
+                            />
+                        ) : task.check_list?.length ? (
+                            <Checklist
+                                items={task.check_list}
+                                onChange={(items: ChecklistItem[]) => {
+                                    updateMut.mutate({ id: task.id, data: { check_list: items } });
+                                }}
+                                editable={false}
+                            />
+                        ) : (
+                            <Typography variant="body2" color="text.disabled">Чек-лист пуст</Typography>
+                        )}
+                    </Box>
 
                     {/* ⚙️ Сложность */}
                     <Box>
