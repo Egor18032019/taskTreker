@@ -25,15 +25,13 @@ public class TaskDtoFactory {
                 .name(entity.getName())
                 .description(entity.getDescription())
                 .createdAt(entity.getCreatedAt())
-                .taskStateId(entity.getTaskState().getId())
                 .checkList(checklistDto)
                 .sizeCategory(entity.getSizeCategory())
+                .status(entity.getStatus())
                 .deadline(entity.getDeadline())
                 .priority(entity.getPriority())
                 .complexity(entity.getComplexity())
-                .projectId(entity.getTaskState() != null && entity.getTaskState().getProject() != null
-                        ? entity.getTaskState().getProject().getId()
-                        : null)
+                .projectId(entity.getProject().getId())
                 .build();
     }
 }

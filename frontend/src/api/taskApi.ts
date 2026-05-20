@@ -1,6 +1,6 @@
 // src/api/taskApi.ts
 import { apiClient } from './axiosInstance';
-import type { Task, TaskCreate, TaskUpdate, Ack, FetchTasksParams } from '../types';
+import type { Task, TaskCreate, TaskUpdate, Ack, FetchTasksParams, TaskStatus } from '../types';
 
 export const taskApi = {
     fetchAll: (params?: FetchTasksParams) =>
@@ -16,11 +16,12 @@ export const taskApi = {
     update: (id: number, data: TaskUpdate) =>
         apiClient.put<Task>(`/tasks/${id}`, data),
 
-    transition: (taskId: number, toStateId: number) =>
-        apiClient.post<Task>(`/tasks/${taskId}/transition`, null, {
-            params: { to_state_id: toStateId }
-        }),
+    updateStatus: (id: number, status: TaskStatus) =>
+        apiClient.patch<Task>(`/tasks/${id}/status`, null, { params: { status } }),
 
     delete: (id: number) =>
         apiClient.delete<Ack>(`/tasks/${id}`),
+
+    patch: (id: number, data: TaskUpdate) =>
+        apiClient.patch<Task>(`/tasks/${id}`, data),
 };

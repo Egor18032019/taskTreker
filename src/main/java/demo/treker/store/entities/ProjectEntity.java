@@ -31,8 +31,4 @@ public class ProjectEntity {
     @Builder.Default
     Instant createdAt = Instant.now();
 
-    @Builder.Default
-    @OneToMany
-    @JoinColumn(name = "project_id")
-    List<TaskStateEntity> taskStates = new ArrayList<>();//инициализируем !
 }

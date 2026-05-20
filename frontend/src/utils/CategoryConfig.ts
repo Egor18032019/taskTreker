@@ -1,5 +1,5 @@
 
-import type { TaskSizeCategory, TaskComplexity, TaskPriority } from '../types';
+import type { TaskSizeCategory, TaskComplexity, TaskPriority, TaskStatus } from '../types';
 
 export const sizeCategoryConfig: Record<
     TaskSizeCategory,
@@ -35,4 +35,10 @@ export const priorityConfig: Record<
 export const isDeadlineOverdue = (deadline: string | null): boolean => {
     if (!deadline) return false;
     return new Date(deadline) < new Date();
+};
+
+export const statusConfig: Record<TaskStatus, { label: string; color: 'default' | 'warning' | 'success'; icon?: string }> = {
+  BACKLOG:    { label: '📋 Бэклог',    color: 'default' },
+  IN_PROGRESS:{ label: '🔄 В работе',  color: 'warning' },
+  DONE:       { label: '✅ Готово',    color: 'success' },
 };

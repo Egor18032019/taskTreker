@@ -8,27 +8,31 @@ import demo.treker.api.exceptoins.NotFoundException;
 import demo.treker.enums.TaskComplexity;
 import demo.treker.enums.TaskPriority;
 import demo.treker.enums.TaskSizeCategory;
+import demo.treker.enums.TaskStatus;
 import demo.treker.store.entities.ChecklistItemEntity;
 import demo.treker.store.entities.ProjectEntity;
 import demo.treker.store.entities.TaskEntity;
-import demo.treker.store.entities.TaskStateEntity;
 import demo.treker.store.repositories.ProjectRepository;
 import demo.treker.store.repositories.TaskRepository;
-import demo.treker.store.repositories.TaskStateRepository;
+import demo.treker.store.specifications.TaskSpecifications;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Map;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
-import org.springframework.scheduling.config.Task;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import org.springframework.web.bind.annotation.RequestParam;
 
 @Service
 @RequiredArgsConstructor
@@ -37,24 +41,6 @@ import java.util.stream.Collectors;
 public class TaskService {
     ProjectRepository projectRepository;
     TaskRepository taskRepository;
-    TaskStateRepository taskStateRepository;
-    TaskStateService taskStateService;
-
-    public List<TaskEntity> fetchTasks(Optional<Long> taskStateId, Optional<String> namePrefix) {
-        var tasks = taskRepository.findAll().stream();
-
-        if (taskStateId.isPresent()) {
-            tasks = tasks.filter(t -> t.getTaskState() != null &&
-                    t.getTaskState().getId().equals(taskStateId.get()));
-        }
-
-        if (namePrefix.isPresent() && !namePrefix.get().trim().isEmpty()) {
-            tasks = tasks.filter(t -> t.getName() != null &&
-                    t.getName().toLowerCase().startsWith(namePrefix.get().toLowerCase()));
-        }
-
-        return tasks.collect(Collectors.toList());
-    }
 
     @Transactional
     public TaskEntity createTask(String name, String description, Long projectId,
@@ -68,36 +54,17 @@ public class TaskService {
         ProjectEntity project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
 
-        // 1. Находим текущий хвост воркфлоу
-        TaskStateEntity tailState = taskStateRepository
-                .findByProjectIdAndRightTaskStateIsNull(projectId)
-                .orElse(null);
-
-        // 2. Создаём новое техническое состояние
-        TaskStateEntity newState = TaskStateEntity.builder()
-                .project(project)
-                .leftTaskState(tailState)  // ссылка на managed entity (если tailState != null)
-                .rightTaskState(null)
-                .build();
-
-        // 3. 🔥 СНАЧАЛА сохраняем НОВОЕ состояние → оно переходит в состояние managed
-        TaskStateEntity savedNewState = taskStateRepository.saveAndFlush(newState);
-
-        // 4. Теперь обновляем СТАРОЕ состояние (ссылается на managed entity → ошибки нет)
-        if (tailState != null) {
-            tailState.setRightTaskState(savedNewState);
-            taskStateRepository.saveAndFlush(tailState);
-        }
 
         // 5. Создаём задачу и привязываем к УЖЕ СОХРАНЁННОМУ состоянию
         TaskEntity task = TaskEntity.builder()
+                .project(project)
                 .name(name)
                 .description(description)
                 .sizeCategory(sizeCategory)
                 .deadline(deadline)
                 .complexity(complexity != null ? TaskComplexity.valueOf(complexity.toUpperCase()) : null)
                 .priority(priority != null ? TaskPriority.valueOf(priority.toUpperCase()) : null)
-                .taskState(savedNewState) // ✅ используем managed-сущность
+                .status(TaskStatus.BACKLOG)
                 .build();
 
         // Добавляем чек-лист
@@ -113,8 +80,7 @@ public class TaskService {
     }
 
 
-
-    public TaskEntity updateTask(Long taskId, String name, String description,TaskSizeCategory sizeCategory,
+    public TaskEntity updateTask(Long taskId, String name, String description, TaskSizeCategory sizeCategory,
             List<ChecklistItemDto> checklist, LocalDate deadline,
             String complexity, String priority) {
 
@@ -171,51 +137,9 @@ public class TaskService {
                 .orElseThrow(() -> new NotFoundException(
                         String.format("Task with id \"%s\" doesn't exist.", taskId)));
 
-        // 2. Сохраняем ссылку на состояние задачи (до удаления)
-        TaskStateEntity taskState = task.getTaskState();
-
-        // 3. 🔥 УДАЛЯЕМ ЗАДАЧУ (orphanRemoval в TaskState не затронет состояние, т.к. связь @ManyToOne)
         taskRepository.deleteById(taskId);
-
-        // 4. Если у задачи было техническое состояние — удаляем его с перелинковкой
-        if (taskState != null) {
-            relinkAndDeleteTaskState(taskState.getId());
-        }
     }
 
-    /**
-     * 🔗 Удаляет TaskState с перелинковкой соседей в воркфлоу
-     */
-    private void relinkAndDeleteTaskState(Long stateId) {
-        TaskStateEntity state = taskStateRepository.findById(stateId).orElse(null);
-        if (state == null) return; // уже удалено или не найдено
-        // 🔒 Проверка: нет ли других задач в этом состоянии ???
-
-        TaskStateEntity left = state.getLeftTaskState().orElse(null);
-        TaskStateEntity right = state.getRightTaskState().orElse(null);
-
-        // 🔗 Перелинковка: левый и правый соседи соединяются напрямую
-        if (left != null && right != null) {
-            // Оба соседа существуют: left → right
-            left.setRightTaskState(right);
-            right.setLeftTaskState(left);
-            taskStateRepository.saveAllAndFlush(List.of(left, right));
-
-        } else if (left != null) {
-            // Только левый: он становится новым хвостом
-            left.setRightTaskState(null);
-            taskStateRepository.saveAndFlush(left);
-
-        } else if (right != null) {
-            // Только правый: он становится новой головой
-            right.setLeftTaskState(null);
-            taskStateRepository.saveAndFlush(right);
-        }
-        // Если оба null — состояние было единственным, просто удаляем
-
-        // 5. 🔥 Удаляем само состояние
-        taskStateRepository.deleteById(stateId);
-    }
 
     public TaskEntity getTaskOrThrow(Long taskId) {
         return taskRepository.findById(taskId)
@@ -223,102 +147,26 @@ public class TaskService {
                         String.format("Task with id \"%s\" doesn't exist.", taskId)));
     }
 
+    // 🔹 Получение задач с фильтрацией
+    public List<TaskEntity> fetchTasks(Long projectId, Optional<TaskStatus> status,
+            Optional<String> namePrefix, Optional<LocalDate> deadline,
+            Optional<String> sortBy, Optional<String> sortDir) {
 
-    //  Получение задач с фильтрацией и сортировкой
-    public List<TaskEntity> fetchTasks(
-            Optional<Long> taskStateId,
-            Optional<String> namePrefix,
-            Optional<Long> projectId,
-            Optional<String> sortBy,
-            Optional<String> sortDir) {
+        // 1. Строим спецификацию фильтрации
+        Specification<TaskEntity> spec = TaskSpecifications.buildFilter(
+                projectId,
+                status.orElse(null),
+                namePrefix.filter(p -> !p.isEmpty()).orElse(null),
+                deadline.orElse(null)
+        );
 
-        // 1. Формируем сортировку через JPA
-        Sort sort = Sort.unsorted();
-        if (sortBy.isPresent() && !sortBy.get().trim().isEmpty()) {
-            Sort.Direction direction = sortDir
-                    .filter(d -> d.equalsIgnoreCase("asc") || d.equalsIgnoreCase("desc"))
-                    .map(d -> d.equalsIgnoreCase("asc") ? Sort.Direction.ASC : Sort.Direction.DESC)
-                    .orElse(Sort.Direction.ASC);
+        // 2. Строим сортировку
+        Sort sort = buildSort(sortBy, sortDir);
 
-            String property;
-            switch (sortBy.get().toLowerCase().replace("_", "")) {
-                case "createdat":
-                    property = "createdAt";
-                    break;
-                case "name":
-                    property = "name";
-                    break;
-                case "deadline":
-                    property = "deadline";
-                    break;
-                case "priority":
-                    property = "priority";
-                    break;
-                case "complexity":
-                    property = "complexity";
-                    break;
-                case "sizepoints":
-                    property = "sizePoints";
-                    break;
-                case "sizecategory":
-                    property = "sizeCategory";
-                    break;
-                case "id":
-                    property = "id";
-                    break;
-                default:
-                    throw new IllegalArgumentException("Unexpected value: " + sortBy);
-            }
-            ;
-            sort = Sort.by(direction, property);
-        }
-
-        // 2. Получаем данные из БД с сортировкой
-        List<TaskEntity> tasks = taskRepository.findAll(sort);
-
-
-        return tasks.stream()
-//todo вынести на бд sql Specification JpaSpecificationExecutor
-                .filter(task -> projectId
-                        .map(pid -> task.getTaskState() != null &&
-                                task.getTaskState().getProject() != null &&
-                                task.getTaskState().getProject().getId().equals(pid))
-                        .orElse(true))
-                // Существующие фильтры
-                .filter(task -> taskStateId
-                        .map(id -> task.getTaskState() != null && task.getTaskState().getId().equals(id))
-                        .orElse(true))
-                .filter(task -> namePrefix
-                        .filter(p -> !p.trim().isEmpty())
-                        .map(p -> task.getName() != null &&
-                                task.getName().toLowerCase().startsWith(p.toLowerCase()))
-                        .orElse(true))
-                .collect(Collectors.toList());
+        // 3. 👇 Выполняем запрос: фильтрация + сортировка НА УРОВНЕ БД
+        return taskRepository.findAll(spec, sort);
     }
 
-    //  Перевод задачи в другое состояние с валидацией воркфлоу
-    public TaskEntity transitionTask(Long taskId, Long toStateId) {
-        // 1. Получаем задачу
-        TaskEntity task = getTaskOrThrow(taskId);
-
-        // 2. Получаем целевое состояние
-        TaskStateEntity targetState = taskStateService.getTaskStateOrThrow(toStateId);
-
-        // 3. Проверяем валидность перехода
-        Long currentStateId = task.getTaskState() != null ? task.getTaskState().getId() : null;
-        if (!taskStateService.canTransition(currentStateId, toStateId)) {
-            throw new BadRequestException(String.format(
-                    "Cannot transition task %d from state %s to %s. ",
-                    taskId,
-                    currentStateId != null ? currentStateId : "null",
-                    toStateId
-            ));
-        }
-
-
-        task.setTaskState(targetState);
-        return taskRepository.saveAndFlush(task);
-    }
 
 
     public TaskEntity patchTask(Long taskId, TaskPatchRequestDto patch) {
@@ -332,10 +180,7 @@ public class TaskService {
         if (patch.getDescription() != null) {
             task.setDescription(patch.getDescription());
         }
-        if (patch.getTaskStateId() != null) {
-            TaskStateEntity state = taskStateService.findById(patch.getTaskStateId());
-            task.setTaskState(state);
-        }
+
         if (patch.getSizeCategory() != null) {
             task.setSizeCategory(patch.getSizeCategory());
         }
@@ -348,7 +193,7 @@ public class TaskService {
         if (patch.getPriority() != null) {
             task.setPriority(patch.getPriority());
         }
-        // Если size_points тоже нужно обновлять – добавь поле в TaskPatchRequest и здесь
+
 
         // === Обработка чеклиста ===
         if (patch.getCheckList() != null) {
@@ -371,5 +216,80 @@ public class TaskService {
 
         // 3. Сохраняем задачу – каскадные операции обновят/удалят/вставят пункты чеклиста
         return taskRepository.save(task);
+    }
+
+    public TaskEntity updateStatus(Long taskId, TaskStatus newStatus) {
+        TaskEntity task = getTaskOrThrow(taskId);
+        task.setStatus(newStatus);
+        return taskRepository.saveAndFlush(task);
+    }
+
+    public Page<TaskEntity> fetchTasksPaginated(Long projectId, Optional<TaskStatus> status,
+            Optional<String> namePrefix, Optional<LocalDate> deadline,
+            Optional<String> sizeCategory,
+            Optional<String> priority,
+            Optional<String> sortBy, Optional<String> sortDir,
+            int page, int size) {
+
+        // 1. Фильтрация через Specification
+        Specification<TaskEntity> spec = TaskSpecifications.buildFilter(
+                projectId,
+                status.orElse(null),
+                namePrefix.filter(p -> !p.isEmpty()).orElse(null),
+                deadline.orElse(null)
+        );
+
+        // 2.   Сортировка через вынесенный метод
+        Sort sort = buildSort(sortBy, sortDir);
+        Pageable pageable = PageRequest.of(page, size, sort);
+
+        // 3. Выполнение запроса: фильтрация + сортировка + пагинация НА УРОВНЕ БД
+        return taskRepository.findAll(spec, pageable);
+    }
+
+    /**
+     * Строит объект Sort для JPA на основе параметров сортировки
+     *
+     * @param sortBy  поле для сортировки (name, deadline, priority, createdAt, status)
+     * @param sortDir направление: "asc" или "desc"
+     * @return готовый Sort для использования в repository.findAll(spec, sort)
+     */
+    private Sort buildSort(Optional<String> sortBy, Optional<String> sortDir) {
+        if (sortBy.isEmpty() || sortBy.get().trim().isEmpty()) {
+            return Sort.unsorted();
+        }
+
+        // Определяем направление
+        Sort.Direction direction = sortDir
+                .filter(d -> d.equalsIgnoreCase("asc") || d.equalsIgnoreCase("desc"))
+                .map(d -> d.equalsIgnoreCase("asc") ? Sort.Direction.ASC : Sort.Direction.DESC)
+                .orElse(Sort.Direction.ASC);
+
+        String property;
+        switch (sortBy.get().toLowerCase()) {
+            case "deadline":
+                property = "deadline";
+                break;
+            case "priority":
+                property = "priority";
+                break;
+            case "complexity":
+                property = "complexity";
+                break;
+            case "createdat":
+            case "created_at":
+                property = "createdAt";
+                break;
+            case "name":
+                property = "name";
+                break;
+            case "status":
+                property = "status";
+                break;
+            default:
+                property = "id";
+        }
+
+        return Sort.by(direction, property);
     }
 }

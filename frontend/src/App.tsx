@@ -39,7 +39,7 @@ function App() {
                                     <Button color="inherit" component={Link} to="/">Проекты
                                     </Button>
                                 </Typography>
-                                <Button color="inherit" component={Link} to="/state">Состояния</Button>
+                                <Button color="inherit" component={Link} to="/state">Профиль</Button>
 
                             </Toolbar>
                         </AppBar>

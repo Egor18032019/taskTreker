@@ -1,8 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { taskApi } from '../api/taskApi';
-import type { TaskCreate, FetchTasksParams } from '../types';
-import { useNotification } from '../contexts/NotificationContext';
-import { getErrorMessage } from '../utils/getErrorMessage';
+import type { TaskCreate, FetchTasksParams, TaskUpdate, TaskStatus } from '../types';
 
 export const useTasks = (params?: FetchTasksParams) =>
   useQuery({
@@ -29,7 +27,8 @@ export const useCreateTask = () => {
 export const useUpdateTask = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, data }: { id: number; data: Partial<TaskCreate> }) => taskApi.update(id, data),
+    mutationFn: ({ id, data }: { id: number; data: TaskUpdate }) =>
+      taskApi.patch(id, data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['tasks'] }),
   });
 };
@@ -42,19 +41,11 @@ export const useDeleteTask = () => {
   });
 };
 
-export const useTransitionTask = () => {
+export const useUpdateTaskStatus = () => {
   const qc = useQueryClient();
-  const { notify } = useNotification();
-
   return useMutation({
-    mutationFn: ({ taskId, toStateId }: { taskId: number; toStateId: number }) =>
-      taskApi.transition(taskId, toStateId),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['tasks'] });
-      notify('Задача перемещена', 'success');
-    },
-    onError: (error: unknown) => {
-      notify(getErrorMessage(error), 'error');
-    },
+    mutationFn: ({ id, status }: { id: number; status: TaskStatus }) =>
+      taskApi.updateStatus(id, status),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['tasks'] }),
   });
 };

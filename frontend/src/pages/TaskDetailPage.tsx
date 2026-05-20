@@ -4,14 +4,19 @@ import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import {
     Container, Typography, Box, Button, Stack, Card, CardContent,
     Chip, IconButton, Divider, Alert, CircularProgress,
-    TextField
+    TextField,
+    MenuItem,
+    FormControl, Select
 } from '@mui/material';
-import { ArrowBack, Edit, Delete, CalendarToday, BarChart, Grade, PriorityHigh } from '@mui/icons-material';
-import { useTask, useUpdateTask, useDeleteTask } from '../hooks/useTasks';
-import { useWorkflow } from '../hooks/useTaskStates';
-import type { TaskUpdate, ChecklistItem } from '../types';
-import { sizeCategoryConfig, complexityConfig, priorityConfig, isDeadlineOverdue } from '../utils/ColorCategoryConfig';
+import {
+    ArrowBack, Edit, Delete, CalendarToday, BarChart, Grade, PriorityHigh
+} from '@mui/icons-material';
+import { useTask, useUpdateTask, useDeleteTask, useUpdateTaskStatus } from '../hooks/useTasks';
+
+import type { TaskUpdate, ChecklistItem, TaskStatus } from '../types';
+import { sizeCategoryConfig, complexityConfig, priorityConfig, isDeadlineOverdue } from '../utils/CategoryConfig';
 import { Checklist } from '../components/Checklist';
+import { StatusChip } from '../components/StatusChip';
 
 export const TaskDetailPage: React.FC = () => {
     const { id } = useParams<{ id: string }>();
@@ -21,10 +26,11 @@ export const TaskDetailPage: React.FC = () => {
     // Получаем project_id: либо из state, либо (резерв) из задачи
     const projectIdFromState = (location.state as any)?.fromProjectId;
     const { data: task, isLoading, error } = useTask(taskId ?? 0);
-    const { data: workflow } = useWorkflow(task?.project_id ?? 0);
+
 
     const updateMut = useUpdateTask();
     const deleteMut = useDeleteTask();
+    const updateStatusMut = useUpdateTaskStatus();
 
     const [isEditing, setIsEditing] = useState(false);
     const [form, setForm] = useState<TaskUpdate>({
@@ -41,7 +47,7 @@ export const TaskDetailPage: React.FC = () => {
             setForm({
                 name: task.name,
                 description: task.description ?? undefined,
-                task_state_id: task.task_state_id ?? undefined,
+                status: task.status,
                 check_list: task.check_list?.map(item => ({
                     id: item.id,
                     text: item.text,
@@ -88,7 +94,7 @@ export const TaskDetailPage: React.FC = () => {
             setForm({
                 name: task.name,
                 description: task.description ?? undefined,
-                task_state_id: task.task_state_id ?? undefined,
+                status: task.status ?? undefined,
                 check_list: task.check_list?.map(item => ({
                     id: item.id,
                     text: item.text,
@@ -129,13 +135,6 @@ export const TaskDetailPage: React.FC = () => {
         );
     }
 
-    // Позиция в воркфлоу
-    const workflowIndex = workflow?.findIndex(s => s.id === task.task_state_id) ?? -1;
-
-    const currentStateLabel = workflowIndex >= 0 ? `Этап ${workflowIndex + 1}` : 'Без состояния';
-
-
-    console.log(workflow && workflowIndex >= 0 && workflowIndex <= workflow.length - 1);
     return (
         <Container maxWidth="md" sx={{ py: 4 }}>
             {/* Хедер с навигацией */}
@@ -153,8 +152,7 @@ export const TaskDetailPage: React.FC = () => {
                         <Button
                             variant="outlined"
                             startIcon={<Edit />}
-                            onClick={() => setIsEditing(true)}
-                        >
+                            onClick={() => setIsEditing(true)}>
                             Редактировать
                         </Button>
                         <Button
@@ -162,8 +160,7 @@ export const TaskDetailPage: React.FC = () => {
                             color="error"
                             startIcon={<Delete />}
                             onClick={handleDelete}
-                            disabled={deleteMut.isPending}
-                        >
+                            disabled={deleteMut.isPending}>
                             Удалить
                         </Button>
                     </Stack>
@@ -173,132 +170,152 @@ export const TaskDetailPage: React.FC = () => {
             {/* Карточка задачи */}
             <Card variant="outlined">
                 <CardContent sx={{ '& > *': { mb: 2 } }}>
-                    {/* 🔗 Состояние / воркфлоу */}
+                    {/* Переходы */}
                     <Box>
                         <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", alignItems: "center" }}>
                             <Chip
-                                label={`#${task.task_state_id} • ${currentStateLabel}`}
+                                label={`#${task.id}`}
                                 color="primary"
                                 variant="outlined"
                                 size="small"
                             />
 
                             {/* Предыдущий этап */}
-                            {workflow && workflowIndex > 0 && (
+                            {(
                                 <Chip
-                                    label={`← Предыдущий: #${workflow[workflowIndex - 1].id}`}
+                                    label={`← Предыдущий: #${task.id}`}
                                     size="small"
                                     variant="outlined"
                                     sx={{ cursor: 'pointer' }}
                                     onClick={() => {
-
-                                        console.log("workflow")
-                                        console.log(workflow)
-                                        console.log("workflowIndex")
-                                        console.log(workflowIndex)
                                         console.log("task")
                                         console.log(task)
-                                        goToNextTask(workflow[workflowIndex - 1].id)
-
+                                        goToNextTask(task.id)
                                     }}
                                 />
                             )}
 
                             {/* Следующий этап */}
-                            {workflow && workflowIndex >= 0 && workflowIndex < workflow.length - 1 && (
+                            {(
                                 <Chip
-                                    label={`→ Следующий: #${workflow[workflowIndex + 1].id}`}
+                                    label={`→ Следующий: #${task.id}`}
                                     size="small"
                                     variant="outlined"
                                     sx={{ cursor: 'pointer' }}
                                     onClick={() => {
-
-                                        goToNextTask(workflow[workflowIndex + 1].id)
-                                        console.log(workflow)
-                                        console.log(workflowIndex)
                                         console.log(task)
 
+                                        goToNextTask(task.id)
                                     }}
                                 />
                             )}
                         </Stack>
                     </Box>
-
-                    {/* Название */}
-                    {isEditing ? (
-                        <TextField
-                            label="Название"
-                            fullWidth
-                            value={form.name ?? ''}
-                            onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
-                            autoFocus
-                        />
-                    ) : (
-                        <Typography variant="h5"
-                            sx={{ fontWeight: 600 }}>{task.name}</Typography>
-                    )
-                    }
-
-                    {/* Описание */}
-                    {isEditing ? (
-                        <TextField
-                            label="Описание"
-                            fullWidth
-                            multiline
-                            rows={4}
-                            value={form.description ?? ''}
-                            onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
-                        />
-                    ) : task.description ? (
-                        <Typography variant="body1" color="text.secondary">{task.description}</Typography>
-                    ) : (
-                        <Typography variant="body2" color="text.disabled">Нет описания</Typography>
-                    )}
-
-                    <Divider />
-
-                    {/* 📏 Размер */}
+                    <Stack direction="row" spacing={2}
+                        sx={{ flexWrap: 'wrap', alignItems: 'center', justifyContent:"space-around" }}>
+                    {/* 🔄 Статус задачи */}
+                    <Stack direction="row" spacing={2}
+                        sx={{ alignItems: "center", mb: 2 }}>
+                        <Typography variant="subtitle2" color="text.secondary">Статус:</Typography>
+                        {isEditing ? (
+                            <FormControl size="small" sx={{ minWidth: 150 }}>
+                                <Select
+                                    value={form.status || 'BACKLOG'}
+                                    onChange={e => setForm(p => ({ ...p, status: e.target.value as TaskStatus }))}
+                                >
+                                    <MenuItem value="BACKLOG">📋 Бэклог</MenuItem>
+                                    <MenuItem value="IN_PROGRESS">🔄 В работе</MenuItem>
+                                    <MenuItem value="DONE">✅ Готово</MenuItem>
+                                </Select>
+                            </FormControl>
+                        ) : (
+                            <StatusChip
+                                status={task.status}
+                                editable={true}
+                                onChange={(newStatus) => {
+                                    updateStatusMut.mutate({ id: task.id, status: newStatus });
+                                }}
+                            />
+                        )}
+                    </Stack>
+                    {/* 📅 Дедлайн */}
                     <Box>
                         <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                            <BarChart fontSize="small" sx={{ verticalAlign: 'middle', mr: 0.5 }} />
-                            Размер
+                            <CalendarToday fontSize="small" sx={{ verticalAlign: 'middle', mr: 0.5 }} />
+                            Срок выполнения
                         </Typography>
-                        {task.size_category ? (
+                        {task.deadline ? (
                             <Chip
-                                label={`${sizeCategoryConfig[task.size_category].icon} ${task.size_category.toLowerCase()}`}
+                                label={task.deadline}
                                 size="small"
-                                color={sizeCategoryConfig[task.size_category].color}
+                                color={isDeadlineOverdue(task.deadline) ? 'error' : 'default'}
+                                variant={isDeadlineOverdue(task.deadline) ? 'filled' : 'outlined'}
                             />
                         ) : (
                             <Typography variant="body2" color="text.disabled">Не задан</Typography>
                         )}
                     </Box>
+                </Stack>
+                {/* Название */}
+                {isEditing ? (
+                    <TextField
+                        label="Название"
+                        fullWidth
+                        value={form.name ?? ''}
+                        onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
+                        autoFocus
+                    />
+                ) : (
+                    <Typography variant="h5"
+                        sx={{ fontWeight: 600 }}>{task.name}</Typography>
+                )}
 
-                    <Divider />
-                    {/* 📋 Чек-лист */}
-                    <Box>
-                        <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                            📋 Чек-лист задач
-                        </Typography>
-                        {isEditing ? (
-                            <Checklist
-                                items={form.check_list || []}
-                                onChange={(items: ChecklistItem[]) => setForm(p => ({ ...p, check_list: items }))}
-                                editable={true}
-                            />
-                        ) : task.check_list?.length ? (
-                            <Checklist
-                                items={task.check_list}
-                                onChange={(items: ChecklistItem[]) => {
-                                    updateMut.mutate({ id: task.id, data: { check_list: items } });
-                                }}
-                                editable={false}
-                            />
-                        ) : (
-                            <Typography variant="body2" color="text.disabled">Чек-лист пуст</Typography>
-                        )}
-                    </Box>
+                {/* Описание */}
+                {isEditing ? (
+                    <TextField
+                        label="Описание"
+                        fullWidth
+                        multiline
+                        rows={4}
+                        value={form.description ?? ''}
+                        onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
+                    />
+                ) : task.description ? (
+                    <Typography variant="body1" color="text.secondary">{task.description}</Typography>
+                ) : (
+                    <Typography variant="body2" color="text.disabled">Нет описания</Typography>
+                )}
 
+                <Divider />
+
+
+
+                <Divider />
+                {/* 📋 Чек-лист */}
+                <Box>
+                    <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                        📋 Чек-лист задач
+                    </Typography>
+                    {isEditing ? (
+                        <Checklist
+                            items={form.check_list || []}
+                            onChange={(items: ChecklistItem[]) => setForm(p => ({ ...p, check_list: items }))}
+                            editable={true}
+                        />
+                    ) : task.check_list?.length ? (
+                        <Checklist
+                            items={task.check_list}
+                            onChange={(items: ChecklistItem[]) => {
+                                updateMut.mutate({ id: task.id, data: { check_list: items } });
+                            }}
+                            editable={false}
+                        />
+                    ) : (
+                        <Typography variant="body2" color="text.disabled">Чек-лист пуст</Typography>
+                    )}
+                </Box>
+
+                <Stack direction="row" spacing={2} sx={{ flexWrap: 'wrap', alignItems: 'center' }}>
                     {/* ⚙️ Сложность */}
                     <Box>
                         <Typography variant="subtitle2" color="text.secondary" gutterBottom>
@@ -334,32 +351,34 @@ export const TaskDetailPage: React.FC = () => {
                             <Typography variant="body2" color="text.disabled">Не задан</Typography>
                         )}
                     </Box>
-
-                    {/* 📅 Дедлайн */}
+                    {/* 📏 Размер */}
                     <Box>
                         <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                            <CalendarToday fontSize="small" sx={{ verticalAlign: 'middle', mr: 0.5 }} />
-                            Срок выполнения
+                            <BarChart fontSize="small" sx={{ verticalAlign: 'middle', mr: 0.5 }} />
+                            Размер
                         </Typography>
-                        {task.deadline ? (
+                        {task.size_category ? (
                             <Chip
-                                label={task.deadline}
+                                label={`${sizeCategoryConfig[task.size_category].icon} ${task.size_category.toLowerCase()}`}
                                 size="small"
-                                color={isDeadlineOverdue(task.deadline) ? 'error' : 'default'}
-                                variant={isDeadlineOverdue(task.deadline) ? 'filled' : 'outlined'}
+                                color={sizeCategoryConfig[task.size_category].color}
                             />
                         ) : (
                             <Typography variant="body2" color="text.disabled">Не задан</Typography>
                         )}
                     </Box>
 
-                    {/* 🕐 Метаданные */}
+
+
+                </Stack>
+                <Stack direction="row" spacing={2} sx={{ flexWrap: 'wrap', alignItems: 'center' }}>
+                    {/*  Метаданные */}
                     <Box>
-                        <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                            📊 Метаданные
-                        </Typography>
                         <Stack direction="row" spacing={2}
                             sx={{ flexWrap: "wrap" }}>
+                            <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                                Метаданные
+                            </Typography>
                             <Typography variant="body2">
                                 <strong>ID:</strong> {task.id}
                             </Typography>
@@ -373,25 +392,27 @@ export const TaskDetailPage: React.FC = () => {
                             )}
                         </Stack>
                     </Box>
+                </Stack>
+            </CardContent>
+        </Card>
 
-                </CardContent>
-            </Card>
-
-            {/* Кнопки сохранения/отмены в режиме редактирования */}
-            {isEditing && (
-                <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
-                    <Button variant="outlined" onClick={handleCancel}>
-                        Отмена
-                    </Button>
-                    <Button
-                        variant="contained"
-                        onClick={handleSave}
-                        disabled={updateMut.isPending || !form.name?.trim()}
-                    >
-                        {updateMut.isPending ? 'Сохранение...' : '💾 Сохранить изменения'}
-                    </Button>
-                </Box>
-            )}
-        </Container>
+            {/* Кнопки сохранения/отмены в режиме редактирования */ }
+    {
+        isEditing && (
+            <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
+                <Button variant="outlined" onClick={handleCancel}>
+                    Отмена
+                </Button>
+                <Button
+                    variant="contained"
+                    onClick={handleSave}
+                    disabled={updateMut.isPending || !form.name?.trim()}
+                >
+                    {updateMut.isPending ? 'Сохранение...' : '💾 Сохранить изменения'}
+                </Button>
+            </Box>
+        )
+    }
+        </Container >
     );
 };

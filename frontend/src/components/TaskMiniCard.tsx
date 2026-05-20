@@ -2,7 +2,7 @@ import React from 'react';
 import { Box, Typography, Chip, Stack } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import type { Task } from '../types';
-import { priorityConfig, isDeadlineOverdue } from '../utils/ColorCategoryConfig';
+import { priorityConfig, isDeadlineOverdue } from '../utils/CategoryConfig';
 
 export const TaskMiniCard: React.FC<{ task: Task }> = ({ task }) => {
   const navigate = useNavigate();

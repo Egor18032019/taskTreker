@@ -6,11 +6,10 @@ import {
     FormControl, InputLabel, Select, MenuItem,
     FormHelperText
 } from '@mui/material';
-import { Edit, Delete, ArrowForward, CalendarToday, Sort, GroupWork, ArrowBack } from '@mui/icons-material';
-import { useTasks, useCreateTask, useUpdateTask, useDeleteTask, useTransitionTask } from '../hooks/useTasks';
-import { useWorkflow, useTaskStates } from '../hooks/useTaskStates';
+import { Edit, Delete, CalendarToday, Sort, GroupWork, ArrowBack } from '@mui/icons-material';
+import { useTasks, useCreateTask, useUpdateTask, useDeleteTask } from '../hooks/useTasks';
 import type { Task, TaskCreate, TaskSizeCategory, FetchTasksParams, ChecklistItem } from '../types';
-import { sizeCategoryConfig, complexityConfig, priorityConfig, isDeadlineOverdue } from '../utils/ColorCategoryConfig';
+import { sizeCategoryConfig, complexityConfig, priorityConfig, isDeadlineOverdue } from '../utils/CategoryConfig';
 import { Checklist } from '../components/Checklist';
 
 export const ProjectTasksPage: React.FC = () => {
@@ -23,7 +22,7 @@ export const ProjectTasksPage: React.FC = () => {
     const [filter, setFilter] = useState('');
     const [open, setOpen] = useState(false);
     const [editing, setEditing] = useState<Task | null>(null);
-    const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+    const [, setSelectedTask] = useState<Task | null>(null);
 
     // Сортировка и группировка
     const [sortBy, setSortBy] = useState<string>('');
@@ -36,29 +35,25 @@ export const ProjectTasksPage: React.FC = () => {
         deadline: '', complexity: undefined, priority: undefined, project_id: projectId,
     });
 
-    // 👇 Параметры запроса
+    // Параметры запроса
     const fetchParams: FetchTasksParams = useMemo(() => {
-        const params: FetchTasksParams = {};
+        const params: FetchTasksParams = {
+            project_id: projectId
+        };
         if (filter) params.name_prefix = filter;
         if (sortBy) params.sort_by = sortBy as any;
         if (sortDir) params.sort_dir = sortDir;
-        if (projectId) params.project_id = projectId;
+
         return params;
     }, [filter, sortBy, sortDir, projectId]);
 
     const { data: tasks, isLoading } = useTasks(fetchParams);
-    const { data: workflow } = useWorkflow(projectId ?? 0);
-    const { data: allStates } = useTaskStates(projectId ? { project_id: projectId } : undefined);
 
     const createMut = useCreateTask();
     const updateMut = useUpdateTask();
     const deleteMut = useDeleteTask();
-    const transitionMut = useTransitionTask();
 
-    // 🔗 Переход задачи в следующее состояние
-    const handleTransition = (task: Task, nextStateId: number) => {
-        transitionMut.mutate({ taskId: task.id, toStateId: nextStateId });
-    };
+
 
     // 🔗 Возврат к списку проектов
     const handleBackToProjects = () => {
@@ -110,49 +105,14 @@ export const ProjectTasksPage: React.FC = () => {
             let key = 'Unspecified';
             if (groupBy === 'priority' && task.priority) key = task.priority;
             else if (groupBy === 'complexity' && task.complexity) key = task.complexity;
-            else if (groupBy === 'task_state_id' && task.task_state_id) {
 
-                const stateIndex = workflow?.findIndex(s => s.id === task.task_state_id);
-                key = stateIndex !== undefined && stateIndex >= 0
-                    ? `(#${task.task_state_id})`
-                    : `State #${task.task_state_id}`;
-            }
             acc[key] = acc[key] || [];
             acc[key].push(task);
             return acc;
         }, {} as Record<string, Task[]>);
-    }, [tasks, groupBy, allStates, workflow]);
+    }, [tasks, groupBy]);
 
-    // 🔗 Рендер панели воркфлоу для выбранной задачи
-    const renderWorkflowBar = (task: Task) => {
-        if (!workflow) return null;
-        const currentStateIndex = workflow.findIndex(s => s.id === task.task_state_id);
-        const currentState = workflow[currentStateIndex];
-        const nextStateId = currentState?.rightTaskStateId;
-        const nextState = workflow.find(s => s.id === nextStateId);
 
-        return (
-            <Box sx={{ mb: 2, p: 1.5, bgcolor: 'background.paper', borderRadius: 1, border: '1px dashed', borderColor: 'divider' }}>
-                <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-                    <Typography variant="caption" color="text.secondary">
-                        🔄 {currentState ? `Этап1 ${currentStateIndex + 1} (#${currentState.id})` : 'Без состояния'}
-                    </Typography>
-                    {nextStateId && nextState && (
-                        <Button
-                            size="small"
-                            variant="outlined"
-                            startIcon={<ArrowForward fontSize="small" />}
-                            onClick={() => handleTransition(task, nextStateId)}
-                            disabled={transitionMut.isPending}
-                            sx={{ ml: 'auto' }}
-                        >
-                            → Этап2 {workflow.findIndex(s => s.id === nextStateId) + 1}
-                        </Button>
-                    )}
-                </Stack>
-            </Box>
-        );
-    };
 
     // 🔗 Рендер одной карточки задачи
     const renderTaskCard = (task: Task) => {
@@ -190,9 +150,6 @@ export const ProjectTasksPage: React.FC = () => {
                             {task.description}
                         </Typography>
                     )}
-
-                    {/* Воркфлоу-панель только если задача выбрана и есть проект */}
-                    {selectedTask?.id === task.id && projectId && renderWorkflowBar(task)}
 
                     {/* Чипы с параметрами */}
                     <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: "wrap", mt: 1 }}>
@@ -255,12 +212,7 @@ export const ProjectTasksPage: React.FC = () => {
                                 variant={isDeadlineOverdue(task.deadline) ? 'filled' : 'outlined'}
                             />
                         )}
-                        {task.size_points > 0 && (
-                            <div>{task.size_points}</div>
 
-                            //todo показывать список или просто кол-во ?
-
-                        )}
                     </Stack>
                 </CardContent>
             </Card>

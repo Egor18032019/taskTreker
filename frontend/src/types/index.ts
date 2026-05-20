@@ -1,31 +1,11 @@
-export interface TaskState {
-    id: number;
-    leftTaskStateId: number | null;
-    rightTaskStateId: number | null;
-    createdAt: string;
-    projectId: number;
-}
-
-export interface TaskStateCreate {
-    project_id: number;
-    left_state_id?: number;
-    right_state_id?: number;
-}
-
-export interface TaskStateUpdate {
-    project_id?: number;
-    left_state_id?: number | null;
-    right_state_id?: number | null;
-}
 
 export interface Task {
-    [x: string]: any;
-    //  project_id?: number;
     id: number;
+    project_id: number;
     name: string;
     description: string | null;
     created_at: string;
-    task_state_id: number | null;
+    status: TaskStatus;
     check_list?: ChecklistItem[];
     size_category: TaskSizeCategory | null;
     deadline: string | null; // ISO: "YYYY-MM-DD"
@@ -36,8 +16,8 @@ export interface Task {
 export interface TaskCreate {
     name: string;
     description?: string;
-    project_id?: number;
-    task_state_id?: number;
+    project_id: number;
+    //     status: TaskStatus; нужно ли при создании статус выставлять ?
     check_list?: ChecklistItem[];
     size_category: TaskSizeCategory | null;
     deadline: string | null;
@@ -48,7 +28,7 @@ export interface TaskCreate {
 export interface TaskUpdate {
     name?: string;
     description?: string;
-    task_state_id?: number | null;
+    status?: TaskStatus;
     check_list?: ChecklistItem[];
     size_category?: TaskSizeCategory;
     deadline?: string;
@@ -82,11 +62,11 @@ export interface FetchProjectsParams {
 
 export interface FetchTasksParams {
     name_prefix?: string;
-    task_state_id?: number;
+    status?: TaskStatus;
     size_category?: string;
     priority?: string;
-    project_id?: number;
-    sort_by?: string;
+    project_id: number;
+    sort_by?: TaskSortBy;
     sort_dir?: 'asc' | 'desc';
 }
 
@@ -103,3 +83,5 @@ export interface ChecklistItem {
 export type TaskSizeCategory = 'SMALL' | 'MEDIUM' | 'LARGE' | 'YEARLY';
 export type TaskComplexity = 'EASY' | 'MEDIUM' | 'HARD' | 'EXPERT';
 export type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+export type TaskSortBy = 'name' | 'deadline' | 'priority' | 'complexity' | 'createdAt' | 'status';
+export type TaskStatus = 'BACKLOG' | 'IN_PROGRESS' | 'DONE';
