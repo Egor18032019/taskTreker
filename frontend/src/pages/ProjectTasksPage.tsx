@@ -119,9 +119,24 @@ export const ProjectTasksPage: React.FC = () => {
         const handleCardClick = (e: React.MouseEvent, task: Task) => {
             // Игнорируем клик, если нажали на кнопку
             if ((e.target as HTMLElement).closest('button')) return;
+
+            //   Формируем массив ID задач в текущем! порядке отображения
+            const taskIds = tasks?.map(t => t.id) || [];
+            const currentIndex = taskIds.indexOf(task.id);
+
             navigate(`/tasks/${task.id}`, {
-                state: { fromProjectId: projectId }
+                state: {
+                    fromProjectId: projectId,
+                    taskIds,           // 👈 [10, 45, 123, 78]
+                    currentIndex,      // 👈 2
+                    filters: {         // 👈 На случай, если нужно пересчитать
+                        project_id: projectId,
+                        sort_by: sortBy,
+                        sort_dir: sortDir,
+                    }
+                }
             });
+
         };
         return (
             <Card key={task.id} variant="outlined"

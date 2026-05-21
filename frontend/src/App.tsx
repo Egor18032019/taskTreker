@@ -39,7 +39,7 @@ function App() {
                                     <Button color="inherit" component={Link} to="/">Проекты
                                     </Button>
                                 </Typography>
-                                <Button color="inherit" component={Link} to="/state">Профиль</Button>
+                                <Button color="inherit" component={Link} to="/profile">Профиль</Button>
 
                             </Toolbar>
                         </AppBar>
@@ -59,6 +59,12 @@ function App() {
                                     </AppLayout>
                                 } />
                                 <Route path="/tasks/:id" element={<TaskDetailPage />} />
+                                <Route path="/profile" element={
+                                    <div>
+                                        <div>The content of the profile page will be available here...</div>
+                                        <div>Содержимое страницы профиля будет доступно здесь...</div>
+                                    </div>
+                                } />
                                 <Route path="*" element={<Navigate to="/projects" replace />} />
                             </Routes>
                         </Box>
