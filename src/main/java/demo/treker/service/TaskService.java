@@ -292,4 +292,8 @@ public class TaskService {
 
         return Sort.by(direction, property);
     }
+
+    public List<TaskEntity> findAll() {
+        return this.taskRepository.findAll();
+    }
 }

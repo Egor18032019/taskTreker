@@ -6,6 +6,7 @@ import demo.treker.enums.TaskComplexity;
 import demo.treker.enums.TaskPriority;
 import demo.treker.enums.TaskSizeCategory;
 import demo.treker.enums.TaskStatus;
+import demo.treker.store.entities.TaskEntity;
 import java.time.LocalDate;
 import java.util.List;
 import lombok.*;
@@ -37,4 +38,6 @@ public class TaskDto {
     TaskPriority priority;
     @JsonProperty("project_id")
     Long projectId;
+
+
 }

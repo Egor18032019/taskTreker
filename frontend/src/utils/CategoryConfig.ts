@@ -3,12 +3,12 @@ import type { TaskSizeCategory, TaskComplexity, TaskPriority, TaskStatus } from 
 
 export const sizeCategoryConfig: Record<
     TaskSizeCategory,
-    { icon: string; color: 'default' | 'primary' | 'success' | 'warning' }
+    { icon: string; color: 'XS' | 'S' | 'M' | 'XL' }
 > = {
-    SMALL: { icon: '🔹', color: 'success' },
-    MEDIUM: { icon: '🔸', color: 'primary' },
-    LARGE: { icon: '🔴', color: 'warning' },
-    YEARLY: { icon: '📅', color: 'default' }
+    SMALL: { icon: '🔹', color: 'XS' },
+    MEDIUM: { icon: '🔸', color: 'S' },
+    LARGE: { icon: '🔶', color: 'M' },
+    YEARLY: { icon: '💎', color: 'XL' }
 };
 
 export const complexityConfig: Record<

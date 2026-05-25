@@ -6,6 +6,7 @@ import demo.treker.api.dto.TaskPatchRequestDto;
 import demo.treker.api.dto.TaskRequestDto;
 import demo.treker.api.factories.TaskDtoFactory;
 import demo.treker.enums.TaskStatus;
+import demo.treker.service.TaskRecommendationService;
 import demo.treker.service.TaskService;
 import demo.treker.store.entities.TaskEntity;
 import java.time.LocalDate;
@@ -14,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.data.domain.Page;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import javax.transaction.Transactional;
@@ -30,6 +32,18 @@ public class TaskController {
 
     TaskService taskService;
     TaskDtoFactory taskDtoFactory;
+    TaskRecommendationService recommendationService;
+
+    @GetMapping("/recommended/today")
+    public ResponseEntity<List<TaskDto>> getRecommendedForToday() {
+//        List<TaskEntity> allTasks = taskService.findAllByUserId(getCurrentUserId());
+        //todo как будет профиль -> поменять
+        List<TaskEntity> allTasks =taskService.findAll();
+        List<TaskEntity> recommended = recommendationService.getRecommendedTasksForToday(allTasks);
+        return ResponseEntity.ok(recommended.stream()
+                .map(taskDtoFactory::toTaskDto)
+                .collect(Collectors.toList()));
+    }
 
     // 🔹 GET /api/tasks?project_id=1&status=IN_PROGRESS
     @GetMapping

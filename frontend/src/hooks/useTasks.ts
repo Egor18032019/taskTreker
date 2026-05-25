@@ -49,3 +49,11 @@ export const useUpdateTaskStatus = () => {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['tasks'] }),
   });
 };
+
+export const useRecommendedTasks = (projectId?: number) =>
+  useQuery({
+    queryKey: ['tasks', 'recommended', 'today', projectId],
+    queryFn: () => taskApi.getRecommendedForToday(projectId).then(r => r.data),
+    staleTime: 5 * 60 * 1000, // 5 минут — рекомендации не меняются каждую секунду
+    refetchOnWindowFocus: false,
+  });

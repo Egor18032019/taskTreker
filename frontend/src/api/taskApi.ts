@@ -24,4 +24,10 @@ export const taskApi = {
 
     patch: (id: number, data: TaskUpdate) =>
         apiClient.patch<Task>(`/tasks/${id}`, data),
+
+    //  Получение рекомендованных задач на сегодня
+    getRecommendedForToday: (projectId?: number) =>
+        apiClient.get<Task[]>('/tasks/recommended/today', {
+            params: projectId ? { project_id: projectId } : undefined
+        }),
 };

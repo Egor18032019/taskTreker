@@ -1,5 +1,7 @@
 package demo.treker.enums;
 
 public enum TaskSizeCategory {
-    SMALL, MEDIUM, LARGE, YEARLY
+    XS, S ,M ,L,XL
 }
+//
+//SMALL, MEDIUM, LARGE, YEARLY

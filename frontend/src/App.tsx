@@ -8,6 +8,7 @@ import { NotificationProvider } from './contexts/NotificationContext';
 import { ProjectTasksPage } from './pages/ProjectTasksPage';
 import { TaskDetailPage } from './pages/TaskDetailPage';
 import { AppLayout } from './components/AppLayout';
+import { RecommendedTasksPage } from './pages/RecommendedTasksPage';
 
 const queryClient = new QueryClient({
     defaultOptions: {
@@ -35,8 +36,9 @@ function App() {
                     <BrowserRouter>
                         <AppBar position="static">
                             <Toolbar>
+                                <Button color="inherit" component={Link} to="/tasks/recommended">Рекомендации</Button>
                                 <Typography variant="h6" sx={{ flexGrow: 1 }}>
-                                    <Button color="inherit" component={Link} to="/">Проекты
+                                    <Button color="inherit" component={Link} to="/projects">Проекты
                                     </Button>
                                 </Typography>
                                 <Button color="inherit" component={Link} to="/profile">Профиль</Button>
@@ -46,8 +48,11 @@ function App() {
 
                         <Box component="main" sx={{ bgcolor: 'background.default', minHeight: '100vh' }}>
                             <Routes>
-
-                                <Route path="/" element={<Navigate to="/projects" replace />} />
+                                <Route
+                                    path="/tasks/recommended"
+                                    element={<RecommendedTasksPage />}
+                                />
+                                <Route path="/" element={<Navigate to="/tasks/recommended" replace />} />
                                 <Route path="/projects" element={
                                     <AppLayout>
                                         <ProjectsPage />

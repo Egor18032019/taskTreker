@@ -61,4 +61,8 @@ public class TaskEntity {
         checklist.add(item);
         item.setTask(this);
     }
+
+    public boolean isCompleted() {
+        return this.status == TaskStatus.DONE;
+    }
 }
