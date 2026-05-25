@@ -10,11 +10,11 @@ import java.util.List;
 
 @Getter
 @Setter
+@Entity
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@FieldDefaults(level = AccessLevel.PRIVATE)//все поля приватные
-@Entity
+@FieldDefaults(level = AccessLevel.PRIVATE)
 @Table(name = "project")
 public class ProjectEntity {
 
@@ -30,5 +30,10 @@ public class ProjectEntity {
 
     @Builder.Default
     Instant createdAt = Instant.now();
+
+    // ! Владелец проекта
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
 
 }

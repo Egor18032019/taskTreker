@@ -1,6 +1,6 @@
 plugins {
-	id 'org.springframework.boot' version '2.6.4'
-	id 'io.spring.dependency-management' version '1.0.11.RELEASE'
+	id 'org.springframework.boot' version '2.7.18'
+	id 'io.spring.dependency-management' version '1.0.15.RELEASE'
 	id 'java'
 }
 
@@ -20,17 +20,35 @@ dependencies {
  * драйвер базы данных
  */
 dependencies {
-	implementation group: 'org.postgresql', name: 'postgresql', version: '42.2.19'
+	implementation group: 'org.postgresql', name: 'postgresql', version: '42.4.4'
 }
 /**
- * Lombok
+ * Утилиты
  */
 dependencies {
 	compileOnly 'org.projectlombok:lombok:1.18.20'
 	testCompileOnly 'org.projectlombok:lombok:1.18.20'
 	annotationProcessor 'org.projectlombok:lombok:1.18.20'
 	testAnnotationProcessor 'org.projectlombok:lombok:1.18.20'
+
+    implementation 'org.mapstruct:mapstruct:1.5.5.Final'
+    annotationProcessor 'org.mapstruct:mapstruct-processor:1.5.5.Final'
+
+    // Swagger / OpenAPI (Springdoc)
+    implementation 'org.springdoc:springdoc-openapi-ui:1.7.0'
 }
+/**
+ * Spring Security
+ */
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+
+    // JWT (JSON Web Token)
+    implementation 'io.jsonwebtoken:jjwt-api:0.11.5'
+    runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.11.5'
+    runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.11.5'
+}
+
 /**
  * Tests
  */
