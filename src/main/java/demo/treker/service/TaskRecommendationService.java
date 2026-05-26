@@ -3,47 +3,57 @@ package demo.treker.service;
 import demo.treker.enums.TaskComplexity;
 import demo.treker.enums.TaskPriority;
 import demo.treker.enums.TaskSizeCategory;
+import demo.treker.store.entities.RecommendationWeights;
 import demo.treker.store.entities.TaskEntity;
+import demo.treker.store.entities.UserProfile;
+import demo.treker.store.repositories.UserProfileRepository;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 
 import java.util.Map;
 import java.util.stream.Collectors;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
+import lombok.experimental.FieldDefaults;
 import org.springframework.stereotype.Service;
 
 @Service
+@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
+@RequiredArgsConstructor
 public class TaskRecommendationService {
 
-    // Веса можно вынести в application.properties
-    private static final double WEIGHT_PRIORITY = 0.35;
-    private static final double WEIGHT_DEADLINE = 0.30;
-    private static final double WEIGHT_COMPLEXITY = 0.20;
-    private static final double WEIGHT_SIZE = 0.15;
+    UserProfileRepository userProfileRepository;
 
-    public List<TaskEntity> getRecommendedTasksForToday(List<TaskEntity> allTasks) {
+    public List<TaskEntity> getRecommendedTasksForToday(List<TaskEntity> userTasks) {
+        // Если список пустой — сразу возвращаем
+        if (userTasks == null || userTasks.isEmpty()) {
+            return List.of();
+        }
+
+        // 🔹 Берём веса из профиля первого пользователя (все задачи одного юзера)
+        Long userId = userTasks.get(0).getProject().getUser().getId();
+        var weights = userProfileRepository.findByUserId(userId)
+                .map(UserProfile::getWeights)
+                .orElseGet(RecommendationWeights::defaultWeights);
+
         LocalDate today = LocalDate.now();
 
-        return allTasks.stream()
-                .filter(task -> !task.isCompleted()) // только незавершённые
-                .filter(task -> !task.getDeadline().isBefore(today)) // не просроченные
-                .map(task -> Map.entry(task, calculateScore(task, today)))
-                .sorted(Map.Entry.<TaskEntity, Double> comparingByValue().reversed())
-                .limit(5) // лимит задач на день (настраиваемо)
+        return userTasks.stream()
+                .filter(task -> !task.isCompleted())
+                .filter(task -> task.getDeadline() == null || !task.getDeadline().isBefore(today))
+                .map(task -> Map.entry(task, calculateScore(task, today, weights)))
+                .sorted(Map.Entry.<TaskEntity, Double>comparingByValue().reversed())
+                .limit(5)
                 .map(Map.Entry::getKey)
                 .collect(Collectors.toList());
     }
 
-    private double calculateScore(TaskEntity task, LocalDate today) {
-        double priorityScore = getPriorityScore(task.getPriority());      // 1-5
-        double deadlineScore = getDeadlineScore(task.getDeadline(), today); // 1-5
-        double complexityScore = getInverseComplexityScore(task.getComplexity()); // 1-5
-        double sizeScore = getInverseSizeScore(task.getSizeCategory());   // 1-5
-
-        return WEIGHT_PRIORITY * priorityScore +
-                WEIGHT_DEADLINE * deadlineScore +
-                WEIGHT_COMPLEXITY * complexityScore +
-                WEIGHT_SIZE * sizeScore;
+    private double calculateScore(TaskEntity task, LocalDate today, RecommendationWeights w) {
+        return w.getPriority() * getPriorityScore(task.getPriority()) +
+                w.getDeadline() * getDeadlineScore(task.getDeadline(), today) +
+                w.getComplexity() * getInverseComplexityScore(task.getComplexity()) +
+                w.getSize() * getInverseSizeScore(task.getSizeCategory());
     }
 
     private double getPriorityScore(TaskPriority priority) {

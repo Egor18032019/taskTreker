@@ -20,11 +20,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
-/**
- * Фильтр JWT-аутентификации.
- * Выполняется ДО стандартных фильтров Spring Security.
- * Извлекает токен из заголовка, валидирует, устанавливает SecurityContext.
- */
 @Component
 @RequiredArgsConstructor
 @Slf4j
@@ -36,17 +31,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private static final String AUTHORIZATION_HEADER = "Authorization";
     private static final String BEARER_PREFIX = "Bearer ";
     private static final String[] PUBLIC_PATHS = {
-            "/api/auth/login",
-            "/api/auth/register",
-            "/api/auth/refresh",
-            "/api/auth/logout",
-            "/swagger-ui.html",
-            "/swagger-ui/**",
-            "/v3/api-docs/**",
-            "/swagger-resources/**",
-            "/webjars/**",
-            "/api/public/**",
-            "/h2-console/**" // если используете H2
+            "/api/auth/login", "/api/auth/register", "/api/auth/refresh", "/api/auth/logout",
+            "/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**", "/swagger-resources/**",
+            "/webjars/**", "/api/public/**", "/h2-console/**"
     };
 
     @Override
@@ -54,13 +41,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             HttpServletResponse response,
             FilterChain filterChain) throws ServletException, IOException {
 
-        // 🔹 1. Пропускаем CORS preflight
+        // 🔹 1. CORS preflight
         if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        // 🔹 2. Пропускаем публичные эндпоинты
+        // 🔹 2. Публичные пути — пропускаем без проверки токена
         String requestPath = request.getRequestURI();
         if (isPublicPath(requestPath)) {
             filterChain.doFilter(request, response);
@@ -74,7 +61,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
 
-        // 🔹 4. Валидируем и устанавливаем аутентификацию
+        // 🔹 4. Валидация и установка аутентификации
         try {
             if (jwtTokenProvider.validateToken(token)) {
                 String username = jwtTokenProvider.getUsername(token);
@@ -85,28 +72,28 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         .map(SimpleGrantedAuthority::new)
                         .collect(Collectors.toList());
 
+                // 🔥 ВАЖНО: Создаём CustomUserDetails как principal (не String!)
+                CustomUserDetails userDetails = new CustomUserDetails(userId, username, authorities);
+
                 UsernamePasswordAuthenticationToken authentication =
-                        new UsernamePasswordAuthenticationToken(username, null, authorities);
+                        new UsernamePasswordAuthenticationToken(userDetails, null, authorities);
 
                 authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                 SecurityContextHolder.getContext().setAuthentication(authentication);
 
-                // 📦 Сохраняем userId в атрибутах запроса (удобно для контроллеров)
+                // Опционально: сохраняем userId для быстрого доступа в контроллерах
                 request.setAttribute("userId", userId);
 
-                log.debug("✅ User '{}' authenticated successfully", username);
+                log.debug("✅ User '{}' (id={}) authenticated via JWT", username, userId);
             }
         } catch (Exception e) {
-            // ⚠️ НЕ прерываем цепочку. Spring Security сам вернёт 401/403 если нужно.
-            log.error("❌ JWT authentication failed: {}", e.getMessage());
+            // Не прерываем цепочку — Spring Security сам обработает 401/403
+            log.error("❌ JWT authentication failed: {}", e.getMessage(), e);
         }
 
         filterChain.doFilter(request, response);
     }
 
-    /**
-     * Извлекает JWT из заголовка Authorization: Bearer <token>
-     */
     private String extractToken(HttpServletRequest request) {
         String header = request.getHeader(AUTHORIZATION_HEADER);
         if (StringUtils.hasText(header) && header.startsWith(BEARER_PREFIX)) {
@@ -115,12 +102,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         return null;
     }
 
-    /**
-     * Проверяет, относится ли путь к публичным (не требует аутентификации)
-     */
     private boolean isPublicPath(String path) {
         return Arrays.stream(PUBLIC_PATHS)
                 .anyMatch(pattern -> pathMatcher.match(pattern, path));
     }
-
 }

@@ -2,13 +2,13 @@ package demo.treker.service;
 
 import demo.treker.api.dto.ChecklistItemDto;
 import demo.treker.api.dto.TaskPatchRequestDto;
-import demo.treker.api.dto.TaskRequestDto;
 import demo.treker.api.exceptoins.BadRequestException;
 import demo.treker.api.exceptoins.NotFoundException;
 import demo.treker.enums.TaskComplexity;
 import demo.treker.enums.TaskPriority;
 import demo.treker.enums.TaskSizeCategory;
 import demo.treker.enums.TaskStatus;
+import demo.treker.security.SecurityUtil;
 import demo.treker.store.entities.ChecklistItemEntity;
 import demo.treker.store.entities.ProjectEntity;
 import demo.treker.store.entities.TaskEntity;
@@ -32,7 +32,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
-import org.springframework.web.bind.annotation.RequestParam;
 
 @Service
 @RequiredArgsConstructor
@@ -41,21 +40,23 @@ import org.springframework.web.bind.annotation.RequestParam;
 public class TaskService {
     ProjectRepository projectRepository;
     TaskRepository taskRepository;
+    SecurityUtil securityUtil;
 
-    @Transactional
     public TaskEntity createTask(String name, String description, Long projectId,
-            List<ChecklistItemDto> checklist, TaskSizeCategory sizeCategory, LocalDate deadline,
-            String complexity, String priority) {
+            List<ChecklistItemDto> checklist, TaskSizeCategory sizeCategory,
+            LocalDate deadline, String complexity, String priority) {
 
         if (name == null || name.trim().isEmpty()) {
             throw new BadRequestException("Task name can't be empty.");
         }
 
-        ProjectEntity project = projectRepository.findById(projectId)
-                .orElseThrow(() -> new NotFoundException("Project not found"));
+        Long currentUserId = securityUtil.getCurrentUserId();
 
+        // 🔐 Проверяем, что проект существует И принадлежит текущему пользователю
+        ProjectEntity project = projectRepository.findByUserIdAndId(currentUserId, projectId)
+                .orElseThrow(() -> new NotFoundException(
+                        String.format("Project with id \"%s\" doesn't exist or access denied.", projectId)));
 
-        // 5. Создаём задачу и привязываем к УЖЕ СОХРАНЁННОМУ состоянию
         TaskEntity task = TaskEntity.builder()
                 .project(project)
                 .name(name)
@@ -67,12 +68,14 @@ public class TaskService {
                 .status(TaskStatus.BACKLOG)
                 .build();
 
-        // Добавляем чек-лист
         if (checklist != null) {
             for (int i = 0; i < checklist.size(); i++) {
                 ChecklistItemDto dto = checklist.get(i);
                 ChecklistItemEntity item = ChecklistItemEntity.builder()
-                        .text(dto.getText()).completed(dto.isCompleted()).orderIndex(i).build();
+                        .text(dto.getText())
+                        .completed(dto.isCompleted())
+                        .orderIndex(i)
+                        .build();
                 task.addChecklistItem(item);
             }
         }
@@ -84,7 +87,7 @@ public class TaskService {
             List<ChecklistItemDto> checklist, LocalDate deadline,
             String complexity, String priority) {
 
-        TaskEntity task = getTaskOrThrow(taskId);
+        TaskEntity task = getTaskOrThrow(taskId); // уже проверяет права
 
         if (name != null && !name.trim().isEmpty()) task.setName(name);
         if (description != null) task.setDescription(description);
@@ -93,7 +96,6 @@ public class TaskService {
         if (complexity != null) task.setComplexity(TaskComplexity.valueOf(complexity.toUpperCase()));
         if (priority != null) task.setPriority(TaskPriority.valueOf(priority.toUpperCase()));
 
-        // 🔥 Синхронизируем чек-лист (обновляем/добавляем/удаляем)
         if (checklist != null) syncChecklist(task, checklist);
 
         return taskRepository.saveAndFlush(task);
@@ -105,6 +107,7 @@ public class TaskService {
                 .filter(i -> i.getId() != null)
                 .collect(Collectors.toMap(ChecklistItemDto::getId, i -> i));
 
+        // 1. Обновляем существующие или помечаем на удаление
         List<ChecklistItemEntity> toRemove = new ArrayList<>();
         for (ChecklistItemEntity existing : task.getChecklist()) {
             ChecklistItemDto updated = newMap.get(existing.getId());
@@ -112,19 +115,21 @@ public class TaskService {
                 existing.setText(updated.getText());
                 existing.setCompleted(updated.isCompleted());
                 existing.setOrderIndex(updated.getOrderIndex());
-                newMap.remove(existing.getId()); // помечаем как обработанный
+                newMap.remove(existing.getId());
             } else {
-                toRemove.add(existing); // больше нет в запросе → удалить
+                toRemove.add(existing); // orphanRemoval удалит из БД
             }
         }
         task.getChecklist().removeAll(toRemove);
 
-        // Добавляем новые элементы
+        // 2. Добавляем новые (без ID)
         for (ChecklistItemDto item : newItems) {
             if (item.getId() == null) {
                 ChecklistItemEntity newEntity = ChecklistItemEntity.builder()
-                        .text(item.getText()).completed(item.isCompleted())
-                        .orderIndex(item.getOrderIndex()).build();
+                        .text(item.getText())
+                        .completed(item.isCompleted())
+                        .orderIndex(item.getOrderIndex())
+                        .build();
                 task.addChecklistItem(newEntity);
             }
         }
@@ -132,27 +137,24 @@ public class TaskService {
 
     @Transactional
     public void deleteTask(Long taskId) {
-        // 1. Проверяем существование задачи
-        TaskEntity task = taskRepository.findById(taskId)
-                .orElseThrow(() -> new NotFoundException(
-                        String.format("Task with id \"%s\" doesn't exist.", taskId)));
-
+        TaskEntity task = getTaskOrThrow(taskId); // проверка прав внутри
         taskRepository.deleteById(taskId);
     }
 
-
     public TaskEntity getTaskOrThrow(Long taskId) {
-        return taskRepository.findById(taskId)
+        Long currentUserId = securityUtil.getCurrentUserId();
+        return taskRepository.findByUserIdAndId(currentUserId, taskId)
                 .orElseThrow(() -> new NotFoundException(
-                        String.format("Task with id \"%s\" doesn't exist.", taskId)));
+                        String.format("Task with id \"%s\" doesn't exist or access denied.", taskId)));
     }
 
-    // 🔹 Получение задач с фильтрацией
+    // Получение задач с фильтрацией
     public List<TaskEntity> fetchTasks(Long projectId, Optional<TaskStatus> status,
             Optional<String> namePrefix, Optional<LocalDate> deadline,
             Optional<String> sortBy, Optional<String> sortDir) {
 
-        // 1. Строим спецификацию фильтрации
+        Long currentUserId = securityUtil.getCurrentUserId();
+
         Specification<TaskEntity> spec = TaskSpecifications.buildFilter(
                 projectId,
                 status.orElse(null),
@@ -160,27 +162,24 @@ public class TaskService {
                 deadline.orElse(null)
         );
 
-        // 2. Строим сортировку
+        // 🔹 Добавляем обязательную фильтрацию по пользователю
+        Specification<TaskEntity> userSpec = (root, query, cb) ->
+                cb.equal(root.get("project").get("user").get("id"), currentUserId);
+
         Sort sort = buildSort(sortBy, sortDir);
 
-        // 3. 👇 Выполняем запрос: фильтрация + сортировка НА УРОВНЕ БД
-        return taskRepository.findAll(spec, sort);
+        return taskRepository.findAll(userSpec.and(spec), sort);
     }
 
-
-
     public TaskEntity patchTask(Long taskId, TaskPatchRequestDto patch) {
-        TaskEntity task = taskRepository.findById(taskId)
-                .orElseThrow(() -> new NotFoundException("Task not found with id=" + taskId));
+        TaskEntity task = getTaskOrThrow(taskId);
 
-        // Обновление простых полей (только если они не null)
         if (patch.getName() != null && !patch.getName().isBlank()) {
             task.setName(patch.getName());
         }
         if (patch.getDescription() != null) {
             task.setDescription(patch.getDescription());
         }
-
         if (patch.getSizeCategory() != null) {
             task.setSizeCategory(patch.getSizeCategory());
         }
@@ -194,27 +193,11 @@ public class TaskService {
             task.setPriority(patch.getPriority());
         }
 
-
-        // === Обработка чеклиста ===
+        // 🔹 Чек-лист: используем syncChecklist вместо полной перезаписи
         if (patch.getCheckList() != null) {
-            // 1. Удаляем все старые пункты из коллекции
-            //    Благодаря orphanRemoval = true, они будут удалены из БД при сохранении
-            task.getChecklist().clear();
-
-            // 2. Создаём новые пункты из DTO и добавляем через вспомогательный метод
-            //    orderIndex лучше брать из DTO, чтобы фронтенд управлял порядком
-            patch.getCheckList().forEach(dto -> {
-                ChecklistItemEntity item = ChecklistItemEntity.builder()
-                        .text(dto.getText())
-                        .completed(dto.isCompleted())
-                        .orderIndex(dto.getOrderIndex())
-                        .task(task)   // можно передать здесь, но addChecklistItem сделает это сам
-                        .build();
-                task.addChecklistItem(item);  // используем хелпер для двусторонней связи
-            });
+            syncChecklist(task, patch.getCheckList());
         }
 
-        // 3. Сохраняем задачу – каскадные операции обновят/удалят/вставят пункты чеклиста
         return taskRepository.save(task);
     }
 
@@ -226,25 +209,31 @@ public class TaskService {
 
     public Page<TaskEntity> fetchTasksPaginated(Long projectId, Optional<TaskStatus> status,
             Optional<String> namePrefix, Optional<LocalDate> deadline,
-            Optional<String> sizeCategory,
-            Optional<String> priority,
+            Optional<String> sizeCategory, Optional<String> priority,
             Optional<String> sortBy, Optional<String> sortDir,
             int page, int size) {
 
-        // 1. Фильтрация через Specification
+        Long currentUserId = securityUtil.getCurrentUserId();
+
         Specification<TaskEntity> spec = TaskSpecifications.buildFilter(
-                projectId,
-                status.orElse(null),
+                projectId, status.orElse(null),
                 namePrefix.filter(p -> !p.isEmpty()).orElse(null),
                 deadline.orElse(null)
         );
 
-        // 2.   Сортировка через вынесенный метод
+        Specification<TaskEntity> userSpec = (root, query, cb) ->
+                cb.equal(root.get("project").get("user").get("id"), currentUserId);
+
         Sort sort = buildSort(sortBy, sortDir);
         Pageable pageable = PageRequest.of(page, size, sort);
 
-        // 3. Выполнение запроса: фильтрация + сортировка + пагинация НА УРОВНЕ БД
-        return taskRepository.findAll(spec, pageable);
+        return taskRepository.findAll(userSpec.and(spec), pageable);
+    }
+
+    //    Для рекомендаций: активные задачи пользователя
+    public List<TaskEntity> findActiveTasksByCurrentUser() {
+        Long userId = securityUtil.getCurrentUserId();
+        return taskRepository.findAllActiveByUserId(userId);
     }
 
     /**

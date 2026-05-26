@@ -58,7 +58,7 @@ public class AuthService {
         return generateAuthResponse(user);
     }
 
-    @Transactional
+
     public AuthResponse login(LoginRequest request) {
         Authentication auth = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword())

@@ -23,7 +23,7 @@ import java.time.Instant;
 @Table(name = "task")
 public class TaskEntity {
     @Id
-    @GeneratedValue(strategy = GenerationType.SEQUENCE)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     Long id;
 
     String name;
@@ -55,7 +55,7 @@ public class TaskEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "project_id", nullable = false)
-    ProjectEntity project;
+    ProjectEntity project; //Задача принадлежит проекту → проект принадлежит пользователю
 
     public void addChecklistItem(ChecklistItemEntity item) {
         checklist.add(item);
@@ -65,4 +65,15 @@ public class TaskEntity {
     public boolean isCompleted() {
         return this.status == TaskStatus.DONE;
     }
+
+    /**
+     * Вспомогательный метод для быстрой проверки прав
+     * @param userId
+     * @return boolean
+     */
+    public boolean isOwnedBy(Long userId) {
+        return this.project != null && this.project.getUser() != null
+                && this.project.getUser().getId().equals(userId);
+    }
+
 }
