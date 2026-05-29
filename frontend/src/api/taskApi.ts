@@ -1,6 +1,6 @@
-// src/api/taskApi.ts
+
 import { apiClient } from './axiosInstance';
-import type { Task, TaskCreate, TaskUpdate, Ack, FetchTasksParams, TaskStatus } from '../types';
+import type { Task, TaskCreate, TaskUpdate, Ack, FetchTasksParams, TaskStatus, FetchTasksPaginatedParams, PaginatedResponse } from '../types';
 
 export const taskApi = {
     fetchAll: (params?: FetchTasksParams) =>
@@ -30,4 +30,7 @@ export const taskApi = {
         apiClient.get<Task[]>('/tasks/recommended/today', {
             params: projectId ? { project_id: projectId } : undefined
         }),
+    //   Пагинация задач
+    fetchPaginated: (params: FetchTasksPaginatedParams) =>
+        apiClient.get<PaginatedResponse<Task>>('/tasks/paginated', { params }),
 };

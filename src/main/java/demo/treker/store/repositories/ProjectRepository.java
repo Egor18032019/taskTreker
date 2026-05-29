@@ -21,6 +21,10 @@ public interface  ProjectRepository extends JpaRepository<ProjectEntity, Long> {
     @Query("SELECT p FROM ProjectEntity p WHERE p.user.id = :userId AND LOWER(p.name) LIKE LOWER(CONCAT(:prefix, '%'))")
     Stream<ProjectEntity> streamAllByUserIdAndNameStartsWithIgnoreCase(@Param("userId") Long userId, @Param("prefix") String prefix);
 
+    @Query("SELECT p FROM ProjectEntity p WHERE p.user.id = :userId AND LOWER(p.name)" +
+            " LIKE LOWER(CONCAT('%', :prefix, '%'))")
+    Stream<ProjectEntity> streamAllByUserIdAndNameContainingIgnoreCase(@Param("userId") Long userId, @Param("prefix") String prefix);
+
     @Query("SELECT p FROM ProjectEntity p WHERE p.user.id = :userId")
     Stream<ProjectEntity> streamAllByUserId(@Param("userId") Long userId);
 

@@ -1,6 +1,7 @@
 package demo.treker.api.controllers;
 
 import demo.treker.api.dto.AckDto;
+import demo.treker.api.dto.PaginatedResponseDto;
 import demo.treker.api.dto.TaskDto;
 import demo.treker.api.dto.TaskPatchRequestDto;
 import demo.treker.api.dto.TaskRequestDto;
@@ -10,6 +11,8 @@ import demo.treker.service.TaskRecommendationService;
 import demo.treker.service.TaskService;
 import demo.treker.store.entities.TaskEntity;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import java.time.LocalDate;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -114,10 +117,13 @@ public class TaskController {
         return taskDtoFactory.toTaskDto(taskService.updateStatus(id, status));
     }
 
-    // 🔹 Пагинация (раскомментировать как сделаю на фронте)
-    /*
+    @Operation(summary = "Получить задачи с пагинацией", description = "Возвращает задачи текущего пользователя с поддержкой фильтрации, сортировки и пагинации")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Список задач получен"),
+            @ApiResponse(responseCode = "401", description = "Неавторизован")
+    })
     @GetMapping("/paginated")
-    public Page<TaskDto> fetchTasksPaginated(
+    public ResponseEntity<PaginatedResponseDto<TaskDto>> fetchTasksPaginated(
             @RequestParam(value = "project_id", required = false) Long projectId,
             @RequestParam(value = "status", required = false) Optional<TaskStatus> status,
             @RequestParam(value = "name_prefix", required = false) Optional<String> namePrefix,
@@ -127,11 +133,16 @@ public class TaskController {
             @RequestParam(value = "sort_by", required = false) Optional<String> sortBy,
             @RequestParam(value = "sort_dir", defaultValue = "asc", required = false) Optional<String> sortDir,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(defaultValue = "5") int size) {
 
-        return taskService.fetchTasksPaginated(projectId, status, namePrefix, deadline, sizeCategory, priority,
-                        sortBy, sortDir, page, size)
-                .map(taskDtoFactory::toTaskDto);
+        Page<TaskEntity> taskPage = taskService.fetchTasksPaginated(
+                projectId, status, namePrefix, deadline, sizeCategory, priority,
+                sortBy, sortDir, page, size
+        );
+
+        Page<TaskDto> dtoPage = taskPage.map(taskDtoFactory::toTaskDto);
+
+        return ResponseEntity.ok(PaginatedResponseDto.fromPage(dtoPage));
     }
-    */
+
 }

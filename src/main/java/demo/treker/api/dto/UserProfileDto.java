@@ -13,10 +13,14 @@ import lombok.NoArgsConstructor;
 public class UserProfileDto {
     private Long id;
     private Long userId;
+    private String username;
+    private String email;
     private String telegramHandle;
     private String maxHandle;
     private String avatarUrl;
+
     private WeightsDto weights;
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

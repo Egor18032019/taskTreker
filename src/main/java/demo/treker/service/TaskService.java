@@ -207,29 +207,6 @@ public class TaskService {
         return taskRepository.saveAndFlush(task);
     }
 
-    public Page<TaskEntity> fetchTasksPaginated(Long projectId, Optional<TaskStatus> status,
-            Optional<String> namePrefix, Optional<LocalDate> deadline,
-            Optional<String> sizeCategory, Optional<String> priority,
-            Optional<String> sortBy, Optional<String> sortDir,
-            int page, int size) {
-
-        Long currentUserId = securityUtil.getCurrentUserId();
-
-        Specification<TaskEntity> spec = TaskSpecifications.buildFilter(
-                projectId, status.orElse(null),
-                namePrefix.filter(p -> !p.isEmpty()).orElse(null),
-                deadline.orElse(null)
-        );
-
-        Specification<TaskEntity> userSpec = (root, query, cb) ->
-                cb.equal(root.get("project").get("user").get("id"), currentUserId);
-
-        Sort sort = buildSort(sortBy, sortDir);
-        Pageable pageable = PageRequest.of(page, size, sort);
-
-        return taskRepository.findAll(userSpec.and(spec), pageable);
-    }
-
     //    Для рекомендаций: активные задачи пользователя
     public List<TaskEntity> findActiveTasksByCurrentUser() {
         Long userId = securityUtil.getCurrentUserId();
@@ -282,7 +259,37 @@ public class TaskService {
         return Sort.by(direction, property);
     }
 
-    public List<TaskEntity> findAll() {
-        return this.taskRepository.findAll();
+    // 🔹 Пагинация задач с фильтрацией
+    public Page<TaskEntity> fetchTasksPaginated(
+            Long projectId,
+            Optional<TaskStatus> status,
+            Optional<String> namePrefix,
+            Optional<LocalDate> deadline,
+            Optional<String> sizeCategory,
+            Optional<String> priority,
+            Optional<String> sortBy,
+            Optional<String> sortDir,
+            int page,
+            int size) {
+
+        Long currentUserId = securityUtil.getCurrentUserId();
+
+        // 1. Строим спецификацию фильтрации
+        Specification<TaskEntity> spec = TaskSpecifications.buildFilter(
+                currentUserId,
+                projectId,
+                status.orElse(null),
+                namePrefix.filter(p -> !p.isEmpty()).orElse(null),
+                deadline.orElse(null),
+                sizeCategory.filter(s -> !s.isEmpty()).orElse(null),
+                priority.filter(p -> !p.isEmpty()).orElse(null)
+        );
+
+
+        // 2. Строим сортировку
+        Sort sort = buildSort(sortBy, sortDir);
+        Pageable pageable = PageRequest.of(page, size, sort);
+
+        return taskRepository.findAll(spec, pageable);
     }
 }

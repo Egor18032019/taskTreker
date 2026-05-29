@@ -15,16 +15,16 @@ import java.io.Serializable;
 public class RecommendationWeights implements Serializable {
     private static final long serialVersionUID = 1L;
     private static final double EPSILON = 0.01;
-
+    @Builder.Default
     @Column(name = "weight_priority")
     private Double priority = 0.35;
-
+    @Builder.Default
     @Column(name = "weight_deadline")
     private Double deadline = 0.30;
-
+    @Builder.Default
     @Column(name = "weight_complexity")
     private Double complexity = 0.20;
-
+    @Builder.Default
     @Column(name = "weight_size")
     private Double size = 0.15;
 

@@ -31,7 +31,7 @@ public class ProjectService {
         optionalPrefixName = optionalPrefixName.filter(prefix -> !prefix.trim().isEmpty());
 
         Stream<ProjectEntity> projectStream = optionalPrefixName
-                .map(prefix -> projectRepository.streamAllByUserIdAndNameStartsWithIgnoreCase(currentUserId, prefix))
+                .map(prefix -> projectRepository.streamAllByUserIdAndNameContainingIgnoreCase(currentUserId, prefix))
                 .orElseGet(() -> projectRepository.streamAllByUserId(currentUserId));
 
         return projectStream.collect(Collectors.toList());

@@ -31,7 +31,7 @@ public class TaskRecommendationService {
             return List.of();
         }
 
-        // 🔹 Берём веса из профиля первого пользователя (все задачи одного юзера)
+        //   Берём веса из профиля первого пользователя (все задачи одного юзера)
         Long userId = userTasks.get(0).getProject().getUser().getId();
         var weights = userProfileRepository.findByUserId(userId)
                 .map(UserProfile::getWeights)
@@ -43,7 +43,7 @@ public class TaskRecommendationService {
                 .filter(task -> !task.isCompleted())
                 .filter(task -> task.getDeadline() == null || !task.getDeadline().isBefore(today))
                 .map(task -> Map.entry(task, calculateScore(task, today, weights)))
-                .sorted(Map.Entry.<TaskEntity, Double>comparingByValue().reversed())
+                .sorted(Map.Entry.<TaskEntity, Double> comparingByValue().reversed())
                 .limit(5)
                 .map(Map.Entry::getKey)
                 .collect(Collectors.toList());
@@ -57,6 +57,7 @@ public class TaskRecommendationService {
     }
 
     private double getPriorityScore(TaskPriority priority) {
+        if (priority == null) return 0.1;
         switch (priority) {
             case CRITICAL:
                 return 4.0;
@@ -81,6 +82,7 @@ public class TaskRecommendationService {
     }
 
     private double getInverseComplexityScore(TaskComplexity complexity) {
+        if (complexity == null) return 0.1;
         // Чем проще задача — тем выше скор для выполнения сегодня
         switch (complexity) {
             case EASY:
@@ -98,6 +100,7 @@ public class TaskRecommendationService {
 
     private double getInverseSizeScore(TaskSizeCategory size) {
         // Чем меньше задача — тем реалистичнее сделать её сегодня
+        if (size == null) return 0.1;
         switch (size) {
             case XS:
                 return 5.0;
@@ -106,7 +109,7 @@ public class TaskRecommendationService {
             case M:
                 return 3.0;
             case L:
-                return 1.0;
+                return 2.0;
             case XL:
                 return 1.0;
             default:

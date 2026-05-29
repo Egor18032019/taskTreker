@@ -1,3 +1,83 @@
+export interface PaginatedResponse<T> {
+  content: T[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+  first: boolean;
+  last: boolean;
+  hasNext: boolean;
+  hasPrevious: boolean;
+}
+
+export interface FetchTasksPaginatedParams extends FetchTasksParams {
+  page?: number;
+  size?: number;
+}
+
+
+export interface WeightsDto {
+  priority?: number;
+  deadline?: number;
+  complexity?: number;
+  size?: number;
+}
+
+export interface UserProfile {
+  id: number;
+  userId: number;
+  username: string;
+  email: string;
+  telegramHandle?: string;
+  maxHandle?: string;
+  avatarUrl?: string;
+  weights: WeightsDto;
+  createdAt: string;
+  updatedAt: string;
+}
+export interface ProfileForm {
+  email: string;
+  telegramHandle: string;
+  maxHandle: string;
+  weights: WeightsDto;
+}
+export interface ProfileUpdateRequest {
+  email?: string;
+  telegramHandle?: string;
+  maxHandle?: string;
+  weights?: WeightsDto;
+}
+
+export interface RegisterRequest {
+  username: string;
+  email: string;
+  password: string;
+}
+
+export interface LoginRequest {
+  username: string;
+  password: string;
+}
+
+export interface AuthResponse {
+  accessToken: string;
+  refreshToken: string;
+  expiresInSec: number;
+  profile: UserProfile;
+}
+
+export interface UserProfile {
+  id: number;
+  userId: number;
+  username: string;
+  email: string;
+  telegramHandle?: string;
+  maxHandle?: string;
+  weights: WeightsDto;
+  createdAt: string;
+  updatedAt: string;
+}
+
 
 export interface Task {
     id: number;

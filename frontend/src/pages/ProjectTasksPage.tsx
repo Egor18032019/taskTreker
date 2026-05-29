@@ -1,18 +1,21 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
     Container, Typography, Box, Button, Dialog, DialogTitle, DialogContent,
     DialogActions, TextField, Stack, Card, CardContent, IconButton, Chip,
     FormControl, InputLabel, Select, MenuItem,
-    FormHelperText
+    FormHelperText,
+    Pagination,Alert
 } from '@mui/material';
 import { Edit, Delete, CalendarToday, Sort, GroupWork, ArrowBack } from '@mui/icons-material';
-import { useTasks, useCreateTask, useUpdateTask, useDeleteTask } from '../hooks/useTasks';
-import type { Task, TaskCreate, TaskSizeCategory, FetchTasksParams, ChecklistItem } from '../types';
+import { useCreateTask, useUpdateTask, useDeleteTask } from '../hooks/useTasks';
+import type { Task, TaskCreate, TaskSizeCategory, ChecklistItem, FetchTasksPaginatedParams, TaskSortBy } from '../types';
 import { sizeCategoryConfig, complexityConfig, priorityConfig, isDeadlineOverdue } from '../utils/CategoryConfig';
 import { Checklist } from '../components/Checklist';
+import { useTasksPaginated } from '../hooks/useTasksPaginated';
 
 export const ProjectTasksPage: React.FC = () => {
+    // Todo сделать меньше
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
 
@@ -25,9 +28,15 @@ export const ProjectTasksPage: React.FC = () => {
     const [, setSelectedTask] = useState<Task | null>(null);
 
     // Сортировка и группировка
-    const [sortBy, setSortBy] = useState<string>('');
+    const [sortBy, setSortBy] = useState<TaskSortBy | ''>('name');
     const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
     const [groupBy, setGroupBy] = useState<string>('');
+
+    const [page, setPage] = useState(0);
+    const [pageSize, setPageSize] = useState(5);
+    useEffect(() => {
+        setPage(0);
+    }, [filter, sortBy, sortDir, groupBy, projectId,pageSize]);
 
     // 👇 Форма использует snake_case для API-совместимости
     const [form, setForm] = useState<TaskCreate>({
@@ -35,19 +44,26 @@ export const ProjectTasksPage: React.FC = () => {
         deadline: '', complexity: undefined, priority: undefined, project_id: projectId,
     });
 
-    // Параметры запроса
-    const fetchParams: FetchTasksParams = useMemo(() => {
-        const params: FetchTasksParams = {
-            project_id: projectId
-        };
-        if (filter) params.name_prefix = filter;
-        if (sortBy) params.sort_by = sortBy as any;
-        if (sortDir) params.sort_dir = sortDir;
 
-        return params;
-    }, [filter, sortBy, sortDir, projectId]);
+    // 🔹 Параметры для хука пагинации
+    const fetchParams: FetchTasksPaginatedParams = useMemo(() => ({
+        project_id: projectId,
+        name_prefix: filter || undefined,
+        sort_by: sortBy || undefined,
+        sort_dir: sortDir,
+        page,
+        size: pageSize,
+    }), [filter, sortBy, sortDir, page, pageSize, projectId]);
 
-    const { data: tasks, isLoading } = useTasks(fetchParams);
+    const {
+        tasks,
+        pagination,
+        isLoading,
+        isError,
+        refetch,
+    } = useTasksPaginated(fetchParams);
+
+
 
     const createMut = useCreateTask();
     const updateMut = useUpdateTask();
@@ -101,17 +117,20 @@ export const ProjectTasksPage: React.FC = () => {
     // 🔗 Группировка задач на клиенте
     const groupedTasks = useMemo(() => {
         if (!tasks || !groupBy) return { All: tasks };
+
         return tasks.reduce((acc, task) => {
             let key = 'Unspecified';
+
             if (groupBy === 'priority' && task.priority) key = task.priority;
             else if (groupBy === 'complexity' && task.complexity) key = task.complexity;
+            else if (groupBy === 'size_category' && task.size_category) key = task.size_category;
+            else if (groupBy === 'status' && task.status) key = task.status;
 
             acc[key] = acc[key] || [];
             acc[key].push(task);
             return acc;
         }, {} as Record<string, Task[]>);
     }, [tasks, groupBy]);
-
 
 
     // 🔗 Рендер одной карточки задачи
@@ -127,9 +146,9 @@ export const ProjectTasksPage: React.FC = () => {
             navigate(`/tasks/${task.id}`, {
                 state: {
                     fromProjectId: projectId,
-                    taskIds,           // 👈 [10, 45, 123, 78]
-                    currentIndex,      // 👈 2
-                    filters: {         // 👈 На случай, если нужно пересчитать
+                    taskIds,
+                    currentIndex,
+                    filters: {
                         project_id: projectId,
                         sort_by: sortBy,
                         sort_dir: sortDir,
@@ -138,6 +157,8 @@ export const ProjectTasksPage: React.FC = () => {
             });
 
         };
+
+
         return (
             <Card key={task.id} variant="outlined"
                 onClick={(e) => handleCardClick(e, task)}
@@ -171,7 +192,8 @@ export const ProjectTasksPage: React.FC = () => {
                         {task.size_category && (
                             <Chip
                                 label={`${sizeCategoryConfig[task.size_category].icon} ${task.size_category.toLowerCase()}`}
-                                size="small" color={sizeCategoryConfig[task.size_category].color} variant="outlined"
+                                size="small"
+                                variant="outlined"
                             />
                         )}
                         {/* 📋 Превью чек-листа */}
@@ -258,7 +280,10 @@ export const ProjectTasksPage: React.FC = () => {
                         label="Поиск по названию"
                         size="small"
                         value={filter}
-                        onChange={e => setFilter(e.target.value)}
+                        onChange={e => {
+
+                            setFilter(e.target.value)
+                        }}
                         sx={{ width: { xs: '100%', sm: 200 } }}
                     />
 
@@ -304,14 +329,18 @@ export const ProjectTasksPage: React.FC = () => {
                             <MenuItem value="priority">По приоритету</MenuItem>
                             <MenuItem value="complexity">По сложности</MenuItem>
                             <MenuItem value="size_category">По размеру</MenuItem>
-                            <MenuItem value="task_state_id">По состоянию</MenuItem>
+                            <MenuItem value="status">По состоянию</MenuItem>
                             <MenuItem value="deadline">По сроку</MenuItem>
                         </Select>
                     </FormControl>
                 </Stack>
             </Box>
 
-
+            {isError && (
+                <Alert severity="error" sx={{ mb: 2 }}>
+                    ❌ Ошибка загрузки задач. <Button size="small" onClick={() => refetch()}>Повторить</Button>
+                </Alert>
+            )}
 
             {/* Список задач */}
             <Stack spacing={2}>
@@ -329,22 +358,35 @@ export const ProjectTasksPage: React.FC = () => {
                         )}
                     </Box>
                 ) : (
-                    Object.entries(groupedTasks).map(([groupKey, groupTasks]) => (
-                        <Box key={groupKey}>
-                            {groupBy && (
-                                <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 1 }}>
-                                    {groupKey}
-                                    <Chip size="small" label={`${groupTasks.length}`} sx={{ height: 20 }} />
-                                </Typography>
-                            )}
-                            <Stack spacing={1}>
-                                {groupTasks.map(renderTaskCard)}
-                            </Stack>
-                        </Box>
-                    ))
+                    <>
+                        {Object.entries(groupedTasks).map(([groupKey, groupTasks]) => (
+                            <Box key={groupKey}>
+                                {groupBy && (
+                                    <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 1 }}>
+                                        {groupKey}
+                                        <Chip size="small" label={`${groupTasks.length}`} sx={{ height: 20 }} />
+                                    </Typography>
+                                )}
+                                <Stack spacing={1}>
+                                    {groupTasks.map(renderTaskCard)}
+                                </Stack>
+                            </Box>
+                        ))}
+
+                        {/* 🔥 Пагинация */}
+                        {pagination.totalPages > 1 && (
+                            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+                                <Pagination
+                                    count={pagination.totalPages}
+                                    page={pagination.page + 1}         // сервер считает с 0, MUI — с 1
+                                    onChange={(_, newPage) => setPage(newPage - 1)}
+                                    color="primary"
+                                />
+                            </Box>
+                        )}
+                    </>
                 )}
             </Stack>
-
             {/* Модалка создания/редактирования */}
             <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth scroll="paper">
                 <DialogTitle>{editing ? '✏️ Редактировать' : '➕ Новая'} задачу</DialogTitle>
@@ -446,3 +488,5 @@ export const ProjectTasksPage: React.FC = () => {
         </Container >
     );
 };
+
+

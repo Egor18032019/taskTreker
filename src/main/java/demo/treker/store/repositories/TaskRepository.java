@@ -1,6 +1,8 @@
 package demo.treker.store.repositories;
 
 import demo.treker.store.entities.TaskEntity;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
@@ -32,4 +34,13 @@ public interface TaskRepository extends JpaRepository<TaskEntity, Long>, JpaSpec
     List<TaskEntity> findAllActiveWithDeadlineByUserId(@Param("userId") Long userId, @Param("today") LocalDate today);
 
     boolean existsByProjectIdAndId(Long projectId, Long taskId);
+
+    // 🔹 Пагинация с фильтрацией по пользователю (основной метод)
+    @Query("SELECT t FROM TaskEntity t JOIN t.project p WHERE p.user.id = :userId")
+    Page<TaskEntity> findAllByUserId(@Param("userId") Long userId, Pageable pageable);
+
+    // 🔹 Пагинация с фильтрацией по проекту
+    @Query("SELECT t FROM TaskEntity t JOIN t.project p WHERE p.user.id = :userId AND p.id = :projectId")
+    Page<TaskEntity> findAllByUserIdAndProjectId(@Param("userId") Long userId, @Param("projectId") Long projectId, Pageable pageable);
+
 }
